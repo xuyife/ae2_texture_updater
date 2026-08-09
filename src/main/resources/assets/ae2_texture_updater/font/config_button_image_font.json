@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "ae2_texture_updater:gui/config_button.png",
+      "ascent": 11.5,
+      "height": 16,
+      "chars": [
+        "\uE000"
+      ]
+    }
+  ]
+}

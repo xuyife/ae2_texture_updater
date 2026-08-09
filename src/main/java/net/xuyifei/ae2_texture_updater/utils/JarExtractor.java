@@ -1,4 +1,4 @@
-package net.xuyifei.ae2_texture_updater.modification;
+package net.xuyifei.ae2_texture_updater.utils;
 
 import java.io.*;
 import java.util.*;
@@ -46,7 +46,6 @@ public class JarExtractor {
     }
 
     public static List<String> listSubDirectories(String jarPath, String directoryPath) throws IOException {
-        List<String> subDirs = new ArrayList<>();
         Set<String> uniqueDirs = new HashSet<>();
 
         String targetDir = directoryPath.endsWith("/") ?
@@ -77,7 +76,7 @@ public class JarExtractor {
             }
         }
 
-        subDirs.addAll(uniqueDirs);
+        List<String> subDirs = new ArrayList<>(uniqueDirs);
         Collections.sort(subDirs);
         return subDirs;
     }
