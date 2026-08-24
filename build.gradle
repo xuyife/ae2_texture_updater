@@ -3,7 +3,6 @@ plugins {
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
     id 'org.parchmentmc.librarian.forgegradle' version '1.+'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = mod_group_id
@@ -65,10 +64,13 @@ repositories {
     maven { url "https://jitpack.io" }
 }
 
+jarJar.enable()
+
 configurations {
-    shade
-    implementation.extendsFrom shade
-    minecraftLibrary.extendsFrom shade
+    pack
+    implementation.extendsFrom pack
+    minecraftLibrary.extendsFrom pack
+    jarJar.extendsFrom pack
 }
 
 dependencies {
@@ -76,32 +78,10 @@ dependencies {
 
     implementation fg.deobf("me.shedaniel.cloth:cloth-config-forge:11.1.136")
 
-    shade "com.squareup.okhttp3:okhttp:4.12.0"
-    shade 'com.squareup.okio:okio:3.9.0'
-    shade 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
+    pack "com.squareup.okhttp3:okhttp:[4.12.0,4.13.0)"
+    pack 'com.squareup.okio:okio:[3.9.0,3.10.0)'
+    pack 'org.jetbrains.kotlin:kotlin-stdlib:[1.9.22,1.10)'
 }
-
-shadowJar {
-    archiveClassifier.set('')
-    configurations = [project.configurations.shade]
-
-    relocate 'okhttp3', 'net.xuyifei.ae2_texture_updater.shaded.okhttp3'
-    relocate 'okio', 'net.xuyifei.ae2_texture_updater.shaded.okio'
-
-    exclude 'META-INF/*.SF'
-    exclude 'META-INF/*.DSA'
-    exclude 'META-INF/*.RSA'
-
-    finalizedBy 'reobfShadowJar'
-}
-
-reobf {
-    shadowJar {}
-}
-
-tasks.build.dependsOn.clear()
-tasks.build.dependsOn tasks.shadowJar
-tasks.build.dependsOn tasks.reobfShadowJar
 
 tasks.named('processResources', ProcessResources).configure {
     var replaceProperties = [minecraft_version   : minecraft_version, minecraft_version_range: minecraft_version_range,
@@ -118,7 +98,6 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 tasks.named('jar', Jar).configure {
-    enabled = false
     manifest {
         attributes(["Specification-Title"     : mod_id,
                     "Specification-Vendor"    : mod_authors,
