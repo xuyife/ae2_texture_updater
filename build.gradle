@@ -62,6 +62,13 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 repositories {
     maven { url "https://maven.shedaniel.me/" }
     maven { url "https://jitpack.io" }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 jarJar.enable()
@@ -78,9 +85,13 @@ dependencies {
 
     implementation fg.deobf("me.shedaniel.cloth:cloth-config-forge:11.1.136")
 
+    // Kotlin for Forge provides the kotlin-stdlib at runtime (no JarJar bundling).
+    // NOTE: KFF has no modId in mods.toml (it is a language loader), so it cannot be
+    // declared as a mandatory [[dependencies]] entry; users must install it manually.
+    implementation fg.deobf("maven.modrinth:kotlin-for-forge:${kotlin_for_forge_version}")
+
     pack "com.squareup.okhttp3:okhttp:[4.12.0,4.13.0)"
     pack 'com.squareup.okio:okio:[3.9.0,3.10.0)'
-    pack 'org.jetbrains.kotlin:kotlin-stdlib:[1.9.22,1.10)'
 }
 
 tasks.named('processResources', ProcessResources).configure {

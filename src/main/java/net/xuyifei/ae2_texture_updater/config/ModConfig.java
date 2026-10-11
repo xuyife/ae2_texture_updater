@@ -3,7 +3,6 @@ package net.xuyifei.ae2_texture_updater.config;
 import me.shedaniel.autoconfig.ConfigData;
 import me.shedaniel.autoconfig.annotation.Config;
 import me.shedaniel.autoconfig.annotation.ConfigEntry;
-import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
@@ -292,16 +291,8 @@ public class ModConfig implements ConfigData {
         }
 
         @Override
-        @OnlyIn(Dist.CLIENT)
         public String toString() {
-            if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
-                try {
-                    return Component.translatable(translationKey).getString();
-                } catch (Exception | NoSuchMethodError e) {
-                    return this.name();
-                }
-            }
-            return this.name();
+            return translatedOrDefault();
         }
 
         @Override
@@ -324,16 +315,8 @@ public class ModConfig implements ConfigData {
         }
 
         @Override
-        @OnlyIn(Dist.CLIENT)
         public String toString() {
-            if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
-                try {
-                    return Component.translatable(translationKey).getString();
-                } catch (Exception | NoSuchMethodError e) {
-                    return this.name();
-                }
-            }
-            return this.name();
+            return translatedOrDefault();
         }
 
         @Override
@@ -356,16 +339,8 @@ public class ModConfig implements ConfigData {
         }
 
         @Override
-        @OnlyIn(Dist.CLIENT)
         public String toString() {
-            if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
-                try {
-                    return Component.translatable(translationKey).getString();
-                } catch (Exception | NoSuchMethodError e) {
-                    return this.name();
-                }
-            }
-            return this.name();
+            return translatedOrDefault();
         }
 
         @Override

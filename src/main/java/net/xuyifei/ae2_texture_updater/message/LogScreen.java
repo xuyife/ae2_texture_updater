@@ -1,6 +1,5 @@
 package net.xuyifei.ae2_texture_updater.message;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -28,17 +27,19 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 public class LogScreen extends Screen {
+    private static final String[] FILTER_LEVELS = {"all", "error", "warning", "info", "success"};
+
     public final Screen lastScreen;
     private LogList list;
     private JsonArray allMessages;
     private Set<String> hiddenLevels = Sets.newHashSet();
-    private List<Button> filterButtons = Lists.newArrayList();
+    private List<Button> filterButtons = new ArrayList<>();
 
     public LogScreen(Screen lastScreen) {
         super(Component.translatable("screen.ae2_texture_updater.log_screen.title"));
@@ -151,57 +152,54 @@ public class LogScreen extends Screen {
             String type = jo.get("type").getAsString();
             String key = jo.get("key").getAsString();
 
-            JsonArray argsArray = jo.getAsJsonArray("args");
-            Object[] args;
-            if (argsArray != null && !argsArray.isEmpty()) {
-                args = new Object[argsArray.size()];
-                for (int j = 0; j < argsArray.size(); j++) {
-                    JsonElement element = argsArray.get(j);
-                    if (element.isJsonPrimitive()) {
-                        JsonPrimitive primitive = element.getAsJsonPrimitive();
-                        if (primitive.isNumber()) {
-                            args[j] = primitive.getAsNumber();
-                        } else if (primitive.isBoolean()) {
-                            args[j] = primitive.getAsBoolean();
-                        } else {
-                            args[j] = primitive.getAsString();
-                        }
-                    } else {
-                        args[j] = element.getAsString();
-                    }
-                }
-            } else {
-                args = new Object[0];
-            }
-
-            sb.append("[").append(timestamp).append("] [").append(type.toUpperCase()).append("] ").append(Component.translatable(key, args).getString()).append("\n");
+            Object[] args = parseArgs(jo);
+            sb.append("[").append(timestamp).append("] [").append(type.toUpperCase()).append("] ")
+                    .append(Component.translatable(key, args).getString()).append("\n");
         }
         return sb;
+    }
+
+    /** Shared with {@link Entry}: converts the stored JSON args back into format arguments. */
+    static Object @NotNull [] parseArgs(JsonObject message) {
+        JsonArray argsArray = message.getAsJsonArray("args");
+        if (argsArray == null || argsArray.isEmpty()) {
+            return new Object[0];
+        }
+        Object[] args = new Object[argsArray.size()];
+        for (int i = 0; i < argsArray.size(); i++) {
+            JsonElement element = argsArray.get(i);
+            if (element.isJsonPrimitive()) {
+                JsonPrimitive primitive = element.getAsJsonPrimitive();
+                if (primitive.isNumber()) {
+                    args[i] = primitive.getAsNumber();
+                } else if (primitive.isBoolean()) {
+                    args[i] = primitive.getAsBoolean();
+                } else {
+                    args[i] = primitive.getAsString();
+                }
+            } else {
+                args[i] = element.getAsString();
+            }
+        }
+        return args;
     }
 
     private void buildFilterButtons() {
         filterButtons.forEach(this::removeWidget);
         filterButtons.clear();
 
-        String[] levels = {"all", "error", "warning", "info", "success"};
-        String[] displayNames = {
-                Component.translatable("screen.ae2_texture_updater.log_screen.button.all").getString(),
-                Component.translatable("screen.ae2_texture_updater.log_screen.button.error").getString(),
-                Component.translatable("screen.ae2_texture_updater.log_screen.button.warning").getString(),
-                Component.translatable("screen.ae2_texture_updater.log_screen.button.info").getString(),
-                Component.translatable("screen.ae2_texture_updater.log_screen.button.success").getString()
-        };
         int[] counts = countMessages();
 
         int btnWidth = 50;
         int btnHeight = 20;
-        int totalWidth = levels.length * (btnWidth + 5) - 5;
+        int totalWidth = FILTER_LEVELS.length * (btnWidth + 5) - 5;
         int startX = this.width - totalWidth - 10;
         int y = 10;
 
-        for (int i = 0; i < levels.length; i++) {
-            String level = levels[i];
-            String displayName = displayNames[i];
+        for (int i = 0; i < FILTER_LEVELS.length; i++) {
+            String level = FILTER_LEVELS[i];
+            String displayName = Component.translatable(
+                    "screen.ae2_texture_updater.log_screen.button." + level).getString();
             int count = counts[i];
             boolean isHidden = hiddenLevels.contains(level);
 
@@ -242,15 +240,14 @@ public class LogScreen extends Screen {
     }
 
     private int @NotNull [] countMessages() {
-        String[] levels = {"all", "error", "warning", "info", "success"};
-        int[] counts = new int[levels.length];
+        int[] counts = new int[FILTER_LEVELS.length];
 
         for (int i = 0; i < allMessages.size(); i++) {
             JsonObject obj = allMessages.get(i).getAsJsonObject();
             String type = obj.get("type").getAsString();
             counts[0]++;
-            for (int j = 1; j < levels.length; j++) {
-                if (levels[j].equals(type)) {
+            for (int j = 1; j < FILTER_LEVELS.length; j++) {
+                if (FILTER_LEVELS[j].equals(type)) {
                     counts[j]++;
                     break;
                 }
@@ -287,34 +284,14 @@ public class LogScreen extends Screen {
             this.minecraft = minecraft;
             this.logList = logList;
 
-            JsonArray argsArray = line.getAsJsonArray("args");
-            Object[] args;
-            if (argsArray != null && !argsArray.isEmpty()) {
-                args = new Object[argsArray.size()];
-                for (int i = 0; i < argsArray.size(); i++) {
-                    JsonElement element = argsArray.get(i);
-                    if (element.isJsonPrimitive()) {
-                        JsonPrimitive primitive = element.getAsJsonPrimitive();
-                        if (primitive.isNumber()) {
-                            args[i] = primitive.getAsNumber();
-                        } else if (primitive.isBoolean()) {
-                            args[i] = primitive.getAsBoolean();
-                        } else {
-                            args[i] = primitive.getAsString();
-                        }
-                    } else {
-                        args[i] = element.getAsString();
-                    }
-                }
-            } else {
-                args = new Object[0];
-            }
+            Object[] args = parseArgs(line);
+            String type = line.get("type").getAsString();
 
             this.logLine = Component.literal("[" + line.get("timestamp").getAsString() + "]")
                     .withStyle(ChatFormatting.AQUA)
                     .append(Component.literal(" "))
-                    .append(Component.literal("[" + line.get("type").getAsString().toUpperCase() + "]")
-                            .withStyle(style -> switch (line.get("type").getAsString()) {
+                    .append(Component.literal("[" + type.toUpperCase() + "]")
+                            .withStyle(style -> switch (type) {
                                 case "error" -> style.withColor(ChatFormatting.RED);
                                 case "warning" -> style.withColor(ChatFormatting.GOLD);
                                 case "info" -> style.withColor(ChatFormatting.BLUE);
@@ -350,19 +327,13 @@ public class LogScreen extends Screen {
 
     public static class LogList extends ObjectSelectionList<Entry> {
         public final LogScreen thisScreen;
-        public final JsonArray lines;
 
         public LogList(LogScreen screen, Minecraft pMinecraft, int pWidth, int pHeight, int pY0, int pY1, int pItemHeight) {
             super(pMinecraft, pWidth, pHeight, pY0, pY1, pItemHeight);
 
             this.thisScreen = screen;
-            this.lines = UserMessageManager.loadMessages();
 
             setRenderBackground(false);
-
-            for (int i = 0; i < lines.size(); i++) {
-                addEntry(new LogScreen.Entry(pMinecraft, lines.get(i).getAsJsonObject(), this));
-            }
         }
 
         @Override

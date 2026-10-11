@@ -21,19 +21,7 @@ public class ModIdMappingEntry {
         return oldModId;
     }
 
-    public void setOldModId(String oldModId) {
-        this.oldModId = oldModId;
-    }
-
     public String getNewModId() {
         return newModId;
-    }
-
-    public void setNewModId(String newModId) {
-        this.newModId = newModId;
-    }
-
-    public boolean isValid() {
-        return (oldModId != null && !oldModId.isEmpty()) && (newModId != null && !newModId.isEmpty());
     }
 }

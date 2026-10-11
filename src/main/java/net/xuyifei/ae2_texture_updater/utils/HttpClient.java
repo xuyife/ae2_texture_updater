@@ -10,44 +10,49 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.util.concurrent.TimeUnit;
 
-public class HttpClient {
+/**
+ * Lazily built shared {@link OkHttpClient}, configured once from
+ * {@code download.*} config values (timeouts and optional proxy).
+ */
+public final class HttpClient {
     private static volatile OkHttpClient instance;
+
+    private HttpClient() {
+    }
 
     public static @NotNull OkHttpClient getInstance() {
         if (instance == null) {
             synchronized (HttpClient.class) {
                 if (instance == null) {
-                     OkHttpClient temp1 = new OkHttpClient.Builder()
-                            .connectTimeout(AE2TextureUpdater.CONFIG.download.connect_timeout_seconds, TimeUnit.SECONDS)
-                            .readTimeout(AE2TextureUpdater.CONFIG.download.download_timeout_seconds, TimeUnit.SECONDS)
-                            .writeTimeout(AE2TextureUpdater.CONFIG.download.download_timeout_seconds, TimeUnit.SECONDS)
-                            .callTimeout(AE2TextureUpdater.CONFIG.download.connect_timeout_seconds + AE2TextureUpdater.CONFIG.download.download_timeout_seconds, TimeUnit.SECONDS)
-                            .build();
-
-                    if (AE2TextureUpdater.CONFIG.download.proxy.enabled) {
-                        OkHttpClient temp2 = temp1
-                                .newBuilder()
-                                .proxy(new Proxy(AE2TextureUpdater.CONFIG.download.proxy.proxyType == ModConfig.ProxyType.HTTP ? Proxy.Type.HTTP : Proxy.Type.SOCKS,
-                                        new InetSocketAddress(AE2TextureUpdater.CONFIG.download.proxy.host, AE2TextureUpdater.CONFIG.download.proxy.port)))
-                                .build();
-
-                        if (AE2TextureUpdater.CONFIG.download.proxy.useAuthorization) {
-                            instance = temp2
-                                    .newBuilder()
-                                    .proxyAuthenticator((route, response) -> {
-                                          String credential = Credentials.basic(AE2TextureUpdater.CONFIG.download.proxy.username, AE2TextureUpdater.CONFIG.download.proxy.password);
-                                          return response.request().newBuilder().header("Authorization", credential).build();
-                                    })
-                                    .build();
-                        } else {
-                            instance = temp2;
-                        }
-                    } else {
-                        instance = temp1;
-                    }
+                    instance = buildClient();
                 }
             }
         }
         return instance;
+    }
+
+    private static OkHttpClient buildClient() {
+        ModConfig.Download download = AE2TextureUpdater.CONFIG.download;
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .connectTimeout(download.connect_timeout_seconds, TimeUnit.SECONDS)
+                .readTimeout(download.download_timeout_seconds, TimeUnit.SECONDS)
+                .writeTimeout(download.download_timeout_seconds, TimeUnit.SECONDS)
+                .callTimeout(download.connect_timeout_seconds + download.download_timeout_seconds, TimeUnit.SECONDS);
+
+        if (download.proxy.enabled) {
+            applyProxy(builder, download.proxy);
+        }
+        return builder.build();
+    }
+
+    private static void applyProxy(OkHttpClient.Builder builder, ModConfig.Proxy proxy) {
+        Proxy.Type type = proxy.proxyType == ModConfig.ProxyType.HTTP ? Proxy.Type.HTTP : Proxy.Type.SOCKS;
+        builder.proxy(new Proxy(type, new InetSocketAddress(proxy.host, proxy.port)));
+
+        if (proxy.useAuthorization) {
+            builder.proxyAuthenticator((route, response) -> response.request().newBuilder()
+                    .header("Authorization", Credentials.basic(proxy.username, proxy.password))
+                    .build());
+        }
     }
 }

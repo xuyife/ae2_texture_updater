@@ -1,19 +1,30 @@
 package net.xuyifei.ae2_texture_updater.utils;
 
-import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraftforge.api.distmarker.Dist;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
 
 public interface TranslatableEnum {
     String getTranslationKey();
 
-    default String getDisplayName() {
-        return I18n.get(getTranslationKey());
+    /**
+     * Client-safe display name: translated on the client, plain enum name on
+     * any other dist or when translation fails (e.g. missing lang entries).
+     */
+    default String translatedOrDefault() {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            try {
+                return Component.translatable(getTranslationKey()).getString();
+            } catch (Exception | NoSuchMethodError e) {
+                return enumName();
+            }
+        }
+        return enumName();
     }
 
-    default MutableComponent getDisplayComponent() {
-        return Component.translatable(getTranslationKey());
+    private String enumName() {
+        return ((Enum<?>) this).name();
     }
 
     static String generateKey(String categoryPath, String enumName) {

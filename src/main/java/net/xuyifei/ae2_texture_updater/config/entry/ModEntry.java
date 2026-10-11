@@ -33,44 +33,20 @@ public class ModEntry {
         return modId;
     }
 
-    public void setModId(String modId) {
-        this.modId = modId;
-    }
-
     public String getCurseForgeProjectId() {
         return curseForgeProjectId;
     }
 
-    public void setCurseForgeProjectId(String curseForgeProjectId) {
-        this.curseForgeProjectId = curseForgeProjectId;
-    }
-
-
     public String getCurseForgeFileId() {
         return curseForgeFileId;
-    }
-
-    public void setCurseForgeFileId(String curseForgeFileId) {
-        this.curseForgeFileId = curseForgeFileId;
     }
 
     public String getModrinthId() {
         return modrinthId;
     }
 
-    public void setModrinthId(String modrinthId) {
-        this.modrinthId = modrinthId;
-    }
-
+    /** Real file name on CurseForge CDN; needed to build the no-API-key fallback URL. */
     public String getCurseForgeFileName() {
         return curseForgeFileName;
-    }
-
-    public void setCurseForgeFileName(String curseForgeFileName) {
-        this.curseForgeFileName = curseForgeFileName;
-    }
-
-    public boolean isValid() {
-        return modId != null && !modId.isEmpty() && ((curseForgeFileId != null && !curseForgeFileId.isEmpty()) || (modrinthId != null && !modrinthId.isEmpty()));
     }
 }

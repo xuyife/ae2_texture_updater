@@ -12,7 +12,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
 import net.xuyifei.ae2_texture_updater.message.LogScreen;
-import org.apache.commons.compress.utils.Lists;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -48,9 +47,9 @@ public class LogButtonHandler {
             Map<Component, List<AbstractConfigEntry<?>>> categorizedEntries =
                     (Map<Component, List<AbstractConfigEntry<?>>>) method.invoke(configScreen);
 
-            List<Component> components = Lists.newArrayList(categorizedEntries.keySet().iterator());
-
-            return components.contains(Component.translatable("text.autoconfig.ae2_texture_updater.category.__ae2_config_marker"));
+            return categorizedEntries.keySet().stream()
+                    .anyMatch(key -> key.getString().equals(Component
+                            .translatable("text.autoconfig.ae2_texture_updater.category.__ae2_config_marker").getString()));
         } catch (Exception ignored) {
         }
         return false;

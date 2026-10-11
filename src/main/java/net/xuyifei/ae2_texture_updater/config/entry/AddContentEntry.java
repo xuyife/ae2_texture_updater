@@ -21,15 +21,7 @@ public class AddContentEntry {
         return addContent;
     }
 
-    public void setAddContent(String addContent) {
-        this.addContent = addContent;
-    }
-
     public String getPath() {
         return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
     }
 }

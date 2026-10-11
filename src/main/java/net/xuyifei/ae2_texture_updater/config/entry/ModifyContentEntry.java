@@ -21,15 +21,7 @@ public class ModifyContentEntry {
         return modifyContent;
     }
 
-    public void setModifyContent(String modifyContent) {
-        this.modifyContent = modifyContent;
-    }
-
     public String getPath() {
         return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
     }
 }
