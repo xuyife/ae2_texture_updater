@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(grep -oP 'mod_version=\K.*' gradle.properties)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The jarJar-ed "-all" jar is the distributable artifact (embeds okhttp/okio, reobfuscated).
+      # The plain jar is dev-only and must not be published.
+      - name: Collect distributable jar
+        run: |
+          mkdir -p artifacts
+          cp build/libs/*-all.jar artifacts/
+          ls -la artifacts/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.version }}
+          path: artifacts/*.jar
+
+      # Extract the "## <version>" section matching this tag from NEWS.md into release_body.md,
+      # so each GitHub Release carries its changelog. Falls back to a link when the
+      # section is missing (e.g. tag pushed before NEWS.md is updated).
+      - name: Build release notes from NEWS.md
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          SECTION="${GITHUB_REF_NAME#v}"
+          awk -v section="$SECTION" '
+            BEGIN { found = 0 }
+            /^# / { next }
+            /^## / { if (found) exit; found = ($2 == section) ; next }
+            found { print }
+          ' NEWS.md > release_body.md
+          if [ ! -s release_body.md ]; then
+            echo "No '## $SECTION' section found in NEWS.md" >&2
+            echo "See the full changelog in [NEWS.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/NEWS.md)." > release_body.md
+          fi
+          cat release_body.md
+
+      - name: Create Release and Upload
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: release_body.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+          files: artifacts/*.jar
