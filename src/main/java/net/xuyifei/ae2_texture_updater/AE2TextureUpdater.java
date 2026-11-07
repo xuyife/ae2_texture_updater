@@ -14,6 +14,7 @@ import net.xuyifei.ae2_texture_updater.download.ModListManager;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
 import net.xuyifei.ae2_texture_updater.update.ExtractionStep;
+import net.xuyifei.ae2_texture_updater.update.GuiMergeStep;
 import net.xuyifei.ae2_texture_updater.update.ModificationStep;
 import net.xuyifei.ae2_texture_updater.update.PackagingStep;
 import net.xuyifei.ae2_texture_updater.update.UpdatePaths;
@@ -81,8 +82,15 @@ public class AE2TextureUpdater {
                 () -> download() && new ExtractionStep(paths).run());
         pipeline.run(MessageKey.ERROR_ON_MODIFY_CONTENT,
                 () -> new ModificationStep(paths).run());
+        pipeline.run(MessageKey.ERROR_ON_GUI_MERGE,
+                () -> new GuiMergeStep(paths).run(guiMergeProgress()));
         pipeline.run(MessageKey.UNABLE_TO_PACKING_FILES,
                 () -> new PackagingStep(paths, FMLPaths.GAMEDIR.get().resolve("resourcepacks")).run());
+    }
+
+    /** Main progress meter for the GUI merge step (download progress reports onto it). */
+    private static ProgressMeter guiMergeProgress() {
+        return StartupMessageManager.addProgressBar("GUI Repair Layer", 100);
     }
 
     private static boolean download() {

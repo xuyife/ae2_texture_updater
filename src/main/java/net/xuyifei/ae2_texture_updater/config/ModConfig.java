@@ -28,6 +28,10 @@ public class ModConfig implements ConfigData {
     @ConfigEntry.Category("__ae2_config_marker")
     public Modify modify = new Modify();
 
+    @ConfigEntry.Gui.CollapsibleObject
+    @ConfigEntry.Category("__ae2_config_marker")
+    public GuiMerge guiMerge = new GuiMerge();
+
     public static class General {
         @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
         @ConfigEntry.Gui.Tooltip
@@ -257,6 +261,50 @@ public class ModConfig implements ConfigData {
 
         public AddContentList() {
 
+        }
+    }
+
+    /**
+     * GUI repair layer: merges community-fixed screens JSONs and the GUI textures
+     * they reference on top of the extracted 1.21 textures, so GUIs stay aligned on 1.20.1.
+     */
+    public static class GuiMerge {
+        @ConfigEntry.Gui.PrefixText
+        @ConfigEntry.Gui.Tooltip(count = 2)
+        public boolean enabled = true;
+
+        @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
+        @ConfigEntry.Gui.Tooltip(count = 2)
+        public GuiMergeSource source = GuiMergeSource.MODRINTH;
+
+        @ConfigEntry.Gui.Tooltip(count = 2)
+        public String modrinthProjectId = "A8nAKm0R";
+
+        @ConfigEntry.Gui.Tooltip
+        public String directUrl = "";
+    }
+
+    public enum GuiMergeSource implements TranslatableEnum {
+        MODRINTH,
+        DIRECT_URL;
+
+        private final String translationKey;
+
+        GuiMergeSource() {
+            this.translationKey = TranslatableEnum.generateKey(
+                    "guiMerge.source",
+                    this.name()
+            );
+        }
+
+        @Override
+        public String toString() {
+            return translatedOrDefault();
+        }
+
+        @Override
+        public String getTranslationKey() {
+            return translationKey;
         }
     }
 

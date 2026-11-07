@@ -16,3 +16,6 @@ run-data/
 
 # Junie
 .junie/
+
+# DSH Meow Memory Plugin
+.dsh-meow/
