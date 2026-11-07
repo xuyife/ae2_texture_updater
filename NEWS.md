@@ -1,5 +1,13 @@
 # News
 
+## 0.3.1-beta
+
+### Fixed
+
+- Fixed a jar-in-jar **okio version conflict** ([#2](https://github.com/xuyife/ae2_texture_updater/issues/2)): the mod's embedded `okio` range was too narrow, so on modpacks where another mod shipped a newer `okio` (e.g. Arcana's 3.16.4) Forge's JarSelector failed to resolve a common version and the whole contained-jar resolution aborted — which surfaced as a long chain of "missing dependency" errors for unrelated mods (Create, Artifacts, PuzzlesLib, etc.)
+- The declared `okio` range is now widened to `[3.9.0,4.0)` (okio 3.x stays binary-compatible), letting Forge pick whatever higher 3.x version another mod provides
+- Also dropped an orphan ~350 KB `okio 3.6.0` jar that okhttp pulled in transitively but was never declared in `metadata.json`; the distributed jar is now ~1.3 MB with only `okhttp` and `okio`
+
 ## 0.3.0-beta
 
 ### GUI Repair Layer (new)
