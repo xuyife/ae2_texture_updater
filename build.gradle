@@ -97,8 +97,14 @@ dependencies {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
         exclude group: 'org.jetbrains', module: 'annotations'
+        // okio is declared explicitly below with a wide range; exclude okhttp's own
+        // transitive okio so an old version (3.6.0) is not bundled as an orphan jar.
+        exclude group: 'com.squareup.okio', module: 'okio'
     }
-    pack('com.squareup.okio:okio:[3.9.0,3.10.0)') {
+    // okio range is intentionally wide: other mods' jar-in-jar okio (e.g. 3.16.4) must be
+    // selectable by Forge's JarSelector. A narrow disjoint range breaks contained-jar
+    // resolution for the whole pack (see issue #2). okio 3.x stays binary-compatible.
+    pack('com.squareup.okio:okio:[3.9.0,4.0)') {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib'
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-common'
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
