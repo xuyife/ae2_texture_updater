@@ -12,6 +12,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Passed through an env var instead of being read in a step's "if": the secrets
+      # context is not available in step conditionals, the env context is.
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -41,13 +45,16 @@ jobs:
           else
             echo "version=$(grep -oP 'mod_version=\K.*' gradle.properties)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           fi
+          echo "game_version=$(grep -oP 'minecraft_version=\K.*' gradle.properties)" >> "$GITHUB_OUTPUT"
 
       # The jarJar-ed "-all" jar is the distributable artifact (embeds okhttp/okio, reobfuscated).
       # The plain jar is dev-only and must not be published.
       - name: Collect distributable jar
+        id: collect
         run: |
           mkdir -p artifacts
           cp build/libs/*-all.jar artifacts/
+          echo "jar=$(find artifacts -maxdepth 1 -name '*.jar' | head -n1)" >> "$GITHUB_OUTPUT"
           ls -la artifacts/
 
       - name: Upload build artifact
@@ -60,6 +67,7 @@ jobs:
       # so each GitHub Release carries its changelog. Falls back to a link when the
       # section is missing (e.g. tag pushed before NEWS.md is updated).
       - name: Build release notes from NEWS.md
+        id: notes
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           SECTION="${GITHUB_REF_NAME#v}"
@@ -73,6 +81,11 @@ jobs:
             echo "No '## $SECTION' section found in NEWS.md" >&2
             echo "See the full changelog in [NEWS.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/NEWS.md)." > release_body.md
           fi
+          {
+            echo 'body<<RELEASE_BODY_EOF'
+            cat release_body.md
+            echo 'RELEASE_BODY_EOF'
+          } >> "$GITHUB_OUTPUT"
           cat release_body.md
 
       - name: Create Release and Upload
@@ -84,3 +97,25 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
           files: artifacts/*.jar
+
+      - name: Check Modrinth token
+        if: startsWith(github.ref, 'refs/tags/') && env.MODRINTH_TOKEN == ''
+        run: echo "::warning::MODRINTH_TOKEN is not set; skipping the Modrinth upload."
+
+      # Mirror the released jar to Modrinth, reusing the same version number and changelog.
+      # Requires a MODRINTH_TOKEN repository secret (a Modrinth personal access token with the
+      # "Create versions" scope). Without it the upload is skipped with a warning, so a release
+      # never fails just because Modrinth publishing is not configured.
+      - name: Publish to Modrinth
+        if: startsWith(github.ref, 'refs/tags/') && env.MODRINTH_TOKEN != ''
+        uses: cloudnode-pro/modrinth-publish@v2
+        with:
+          token: ${{ env.MODRINTH_TOKEN }}
+          project: mS3GF6Xu
+          name: AE2 Texture Updater ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          changelog: ${{ steps.notes.outputs.body }}
+          loaders: forge
+          game-versions: ${{ steps.version.outputs.game_version }}
+          environment: client_only
+          files: ${{ steps.collect.outputs.jar }}
