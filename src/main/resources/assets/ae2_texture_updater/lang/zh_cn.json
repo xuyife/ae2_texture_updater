@@ -246,5 +246,15 @@
   "screen.ae2_texture_updater.confirm_clear_archive.message": "确定清空日志归档吗？",
   "screen.ae2_texture_updater.confirm_clear_archive.message.success": "清空成功！",
   "screen.ae2_texture_updater.log_screen.button.send_feedback": "发送反馈",
-  "screen.ae2_texture_updater.log_screen.button.open": "日志"
+  "screen.ae2_texture_updater.log_screen.button.open": "日志",
+  "screen.ae2_texture_updater.log_screen.button.history": "历史",
+
+  "screen.ae2_texture_updater.log_archive.title": "历史日志",
+  "screen.ae2_texture_updater.log_archive.button.back": "返回",
+  "screen.ae2_texture_updater.log_archive.message.empty": "暂无历史日志",
+  "screen.ae2_texture_updater.log_archive.message.click_to_view": "点击查看该历史日志",
+  "screen.ae2_texture_updater.log_archive.message.extract_failed": "读取该历史日志失败",
+
+  "toast.ae2_texture_updater.update_problems.title": "AE2材质更新器",
+  "toast.ae2_texture_updater.update_problems.detail": "本次更新出现 %s 个错误、%s 个警告，详细信息请前往日志查看。"
 }

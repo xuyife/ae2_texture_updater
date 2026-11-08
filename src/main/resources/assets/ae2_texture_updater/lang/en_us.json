@@ -246,5 +246,15 @@
   "screen.ae2_texture_updater.confirm_clear_archive.message": "Are you sure you want to clear the log archive?",
   "screen.ae2_texture_updater.confirm_clear_archive.message.success": "Archive cleared!",
   "screen.ae2_texture_updater.log_screen.button.send_feedback": "Send Feedback",
-  "screen.ae2_texture_updater.log_screen.button.open": "Logs"
+  "screen.ae2_texture_updater.log_screen.button.open": "Logs",
+  "screen.ae2_texture_updater.log_screen.button.history": "History",
+
+  "screen.ae2_texture_updater.log_archive.title": "Archived Logs",
+  "screen.ae2_texture_updater.log_archive.button.back": "Back",
+  "screen.ae2_texture_updater.log_archive.message.empty": "No archived logs yet",
+  "screen.ae2_texture_updater.log_archive.message.click_to_view": "Click to view this archived log",
+  "screen.ae2_texture_updater.log_archive.message.extract_failed": "Failed to read the archived log",
+
+  "toast.ae2_texture_updater.update_problems.title": "AE2 Texture Updater",
+  "toast.ae2_texture_updater.update_problems.detail": "%s error(s), %s warning(s) during this update. Check the logs for details."
 }

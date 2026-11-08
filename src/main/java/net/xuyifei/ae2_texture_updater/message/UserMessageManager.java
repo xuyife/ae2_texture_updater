@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.xuyifei.ae2_texture_updater.download.ModListManager;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -36,9 +38,19 @@ public final class UserMessageManager {
     private static final int MAX_LOG_FILES_COUNT = 15;
     private static final Path MESSAGE_FILE_PATH = ModListManager.CACHE_DIR.resolve("user_message.json");
     private static final Path ARCHIVE_DIR = ModListManager.CACHE_DIR.resolve("logs");
+    /** Temporary extraction target for archived logs opened from the log screen. */
+    private static final Path TEMP_DIR = ModListManager.CACHE_DIR.resolve("logs_temp");
 
     private static final List<JsonObject> messageCache = new java.util.ArrayList<>();
     private static boolean initialized = false;
+
+    /**
+     * Counts of warning/error messages recorded during this session, so a startup
+     * toast can tell the player afterwards that something went wrong. Reset at class
+     * load (i.e. per game start), because a new run re-initializes the manager.
+     */
+    private static int warningCount = 0;
+    private static int errorCount = 0;
 
     private UserMessageManager() {
     }
@@ -57,6 +69,21 @@ public final class UserMessageManager {
 
     public static void error(MessageKey messageKey, Object... args) {
         record(MessageType.ERROR, messageKey, args);
+    }
+
+    /** Number of WARNING messages recorded during this game session. */
+    public static synchronized int warningCount() {
+        return warningCount;
+    }
+
+    /** Number of ERROR messages recorded during this game session. */
+    public static synchronized int errorCount() {
+        return errorCount;
+    }
+
+    /** True when this session recorded at least one warning or error. */
+    public static synchronized boolean hasProblems() {
+        return warningCount > 0 || errorCount > 0;
     }
 
     /** Reads the persisted messages for the log screen; returns an empty array when none exist. */
@@ -111,6 +138,15 @@ public final class UserMessageManager {
 
         synchronized (messageCache) {
             messageCache.add(jsonObject);
+        }
+        if (messageType == MessageType.WARNING) {
+            synchronized (UserMessageManager.class) {
+                warningCount++;
+            }
+        } else if (messageType == MessageType.ERROR) {
+            synchronized (UserMessageManager.class) {
+                errorCount++;
+            }
         }
 
         saveToFile();
@@ -180,6 +216,90 @@ public final class UserMessageManager {
         try (InputStream is = new BufferedInputStream(Files.newInputStream(source));
              OutputStream os = new BufferedOutputStream(new GZIPOutputStream(Files.newOutputStream(target)))) {
             is.transferTo(os);
+        }
+    }
+
+    // ------------------------------------------------------- archived log access
+
+    /** A single archived log file offered to the log screen's history picker. */
+    public record ArchivedLog(@NotNull Path file, @NotNull String displayName, long lastModified) {
+    }
+
+    /** Lists archived logs, newest first; the log screen uses this for its picker. */
+    public static List<ArchivedLog> listArchivedLogs() {
+        List<ArchivedLog> result = new java.util.ArrayList<>();
+        try {
+            List<Path> files = listArchives();
+            for (int i = files.size() - 1; i >= 0; i--) {
+                Path file = files.get(i);
+                result.add(new ArchivedLog(file, file.getFileName().toString(),
+                        lastModifiedOrMax(file) == Long.MAX_VALUE ? 0L : lastModifiedOrMax(file)));
+            }
+        } catch (IOException e) {
+            LOGGER.error("Failed to list archived logs: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Decompresses an archived log into a temporary file and returns the path.
+     * Callers must pass it back to {@link #discardTempLog} afterwards so no
+     * leftover file remains in the cache directory.
+     */
+    public static Path extractArchiveToTemp(Path archive) {
+        Path temp = null;
+        try {
+            Files.createDirectories(TEMP_DIR);
+            String baseName = archive.getFileName().toString();
+            if (baseName.endsWith(".gz")) {
+                baseName = baseName.substring(0, baseName.length() - 3);
+            }
+            temp = TEMP_DIR.resolve(baseName);
+            try (InputStream is = new BufferedInputStream(Files.newInputStream(archive));
+                 GZIPInputStream gz = new GZIPInputStream(is);
+                 OutputStream os = new BufferedOutputStream(Files.newOutputStream(temp))) {
+                gz.transferTo(os);
+            }
+            return temp;
+        } catch (IOException e) {
+            LOGGER.error("Failed to extract archived log {}: {}", archive, e.getMessage());
+            if (temp != null) {
+                deleteQuietly(temp);
+            }
+            return null;
+        }
+    }
+
+    /** Deletes a temporary log file created by {@link #extractArchiveToTemp}. */
+    public static void discardTempLog(Path temp) {
+        if (temp != null) {
+            deleteQuietly(temp);
+        }
+    }
+
+    /** Parses a temporary JSON log file into the message array used by the log screen. */
+    public static JsonArray loadMessagesFrom(Path jsonFile) {
+        if (jsonFile == null || !Files.exists(jsonFile)) {
+            return new JsonArray();
+        }
+        try {
+            String content = Files.readString(jsonFile);
+            if (content == null || content.trim().isEmpty()) {
+                return new JsonArray();
+            }
+            JsonArray array = GSON.fromJson(content, JsonArray.class);
+            return array == null ? new JsonArray() : array;
+        } catch (IOException e) {
+            LOGGER.error("Failed to read archived log: {}", e.getMessage());
+            return new JsonArray();
+        }
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            LOGGER.warn("Failed to delete temp log {}: {}", path, e.getMessage());
         }
     }
 

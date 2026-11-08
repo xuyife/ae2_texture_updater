@@ -1,5 +1,13 @@
 # News
 
+## 0.3.2-beta
+
+### Added
+
+- **Startup result toast**: when the texture update recorded any warnings or errors, the first title screen now shows a toast telling the player how many occurred and to check the logs for details
+- **Browse archived logs**: the log screen has a new "History" button that lists previous archived logs (newest first); picking one decompresses it and displays it with the same viewer, with the temporary file removed on close
+- While viewing an archived log, the History and Clear Archive buttons are hidden so screens cannot nest
+
 ## 0.3.1-beta
 
 ### Fixed

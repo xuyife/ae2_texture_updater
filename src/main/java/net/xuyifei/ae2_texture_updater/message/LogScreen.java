@@ -41,15 +41,35 @@ public class LogScreen extends Screen {
     private Set<String> hiddenLevels = Sets.newHashSet();
     private List<Button> filterButtons = new ArrayList<>();
 
+    /** Non-null when this screen shows an archived log extracted to a temp file. */
+    private final Path tempLogFile;
+    /** Title shown at the top; defaults to the current-log title. */
+    private final Component screenTitle;
+
     public LogScreen(Screen lastScreen) {
-        super(Component.translatable("screen.ae2_texture_updater.log_screen.title"));
+        this(lastScreen, null, null);
+    }
+
+    /**
+     * @param lastScreen    screen to return to
+     * @param tempLogFile   temp file backing an archived log, deleted on close; {@code null} for the current log
+     * @param screenTitle   custom title, or {@code null} for the default
+     */
+    public LogScreen(Screen lastScreen, Path tempLogFile, Component screenTitle) {
+        super(screenTitle != null ? screenTitle
+                : Component.translatable("screen.ae2_texture_updater.log_screen.title"));
         this.lastScreen = lastScreen;
+        this.tempLogFile = tempLogFile;
+        this.screenTitle = screenTitle != null ? screenTitle
+                : Component.translatable("screen.ae2_texture_updater.log_screen.title");
     }
 
     @Override
     protected void init() {
         super.init();
-        this.allMessages = UserMessageManager.loadMessages();
+        this.allMessages = this.tempLogFile != null
+                ? UserMessageManager.loadMessagesFrom(this.tempLogFile)
+                : UserMessageManager.loadMessages();
         this.list = new LogList(this, this.minecraft, this.width, this.height, 32, this.height - 32, 16);
         this.addWidget(this.list);
         buildFilterButtons();
@@ -65,29 +85,43 @@ public class LogScreen extends Screen {
         int btnWidth = 100;
         int btnHeight = 20;
         int spacing = 5;
-        int totalWidth = 4 * btnWidth + 3 * spacing;
+        // Viewing an archived log hides the archive-related buttons, so screens cannot nest.
+        boolean viewingArchive = this.tempLogFile != null;
+        int slots = viewingArchive ? 3 : 5;
+        int totalWidth = slots * btnWidth + (slots - 1) * spacing;
         int startX = (this.width - totalWidth) / 2;
         int y = this.height - 25;
+        int slot = 0;
 
         this.addRenderableWidget(Button.builder(
                 Component.translatable("screen.ae2_texture_updater.log_screen.button.copy_all"),
                 button -> copyAllLogs()
-        ).bounds(startX, y, btnWidth, btnHeight).build());
+        ).bounds(startX + (slot++) * (btnWidth + spacing), y, btnWidth, btnHeight).build());
 
         this.addRenderableWidget(Button.builder(
                 Component.translatable("screen.ae2_texture_updater.log_screen.button.export"),
                 button -> exportLogs()
-        ).bounds(startX + btnWidth + spacing, y, btnWidth, btnHeight).build());
+        ).bounds(startX + (slot++) * (btnWidth + spacing), y, btnWidth, btnHeight).build());
 
-        this.addRenderableWidget(Button.builder(
-                Component.translatable("screen.ae2_texture_updater.log_screen.button.clear_archive"),
-                button -> clearArchive()
-        ).bounds(startX + 2 * (btnWidth + spacing), y, btnWidth, btnHeight).build());
+        if (!viewingArchive) {
+            // Archived logs can be browsed and displayed with the same rendering logic.
+            Button historyButton = Button.builder(
+                    Component.translatable("screen.ae2_texture_updater.log_screen.button.history"),
+                    button -> minecraft.setScreen(new LogArchiveScreen(this))
+            ).bounds(startX + (slot++) * (btnWidth + spacing), y, btnWidth, btnHeight).build();
+            historyButton.active = !UserMessageManager.listArchivedLogs().isEmpty();
+            this.addRenderableWidget(historyButton);
+
+            this.addRenderableWidget(Button.builder(
+                    Component.translatable("screen.ae2_texture_updater.log_screen.button.clear_archive"),
+                    button -> clearArchive()
+            ).bounds(startX + (slot++) * (btnWidth + spacing), y, btnWidth, btnHeight).build());
+        }
 
         this.addRenderableWidget(Button.builder(
                 Component.translatable("screen.ae2_texture_updater.log_screen.button.send_feedback"),
                 button -> sendFeedback()
-        ).bounds(startX + 3 * (btnWidth + spacing), y, btnWidth, btnHeight).build());
+        ).bounds(startX + (slot++) * (btnWidth + spacing), y, btnWidth, btnHeight).build());
     }
 
     private void copyAllLogs() {
@@ -265,12 +299,16 @@ public class LogScreen extends Screen {
         if (this.list != null) {
             this.list.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
         }
-        pGuiGraphics.drawString(this.font, Component.translatable("screen.ae2_texture_updater.log_screen.title"), 35, 12, 0xFFFFFF);
+        pGuiGraphics.drawString(this.font, this.screenTitle, 35, 12, 0xFFFFFF);
         super.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
     }
 
     @Override
     public void onClose() {
+        // An archived log is extracted to a temp file; never leave it behind.
+        if (this.tempLogFile != null) {
+            UserMessageManager.discardTempLog(this.tempLogFile);
+        }
         minecraft.setScreen(this.lastScreen);
     }
 
