@@ -41,10 +41,18 @@ jobs:
         id: version
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            VERSION="${GITHUB_REF_NAME#v}"
           else
-            echo "version=$(grep -oP 'mod_version=\K.*' gradle.properties)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            VERSION="$(grep -oP 'mod_version=\K.*' gradle.properties)-$(git rev-parse --short HEAD)"
           fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Release channel for Modrinth: alpha > beta (rc/pre also count as beta) > release.
+          case "$VERSION" in
+            *alpha*) CHANNEL=alpha ;;
+            *beta*|*rc*|*pre*) CHANNEL=beta ;;
+            *) CHANNEL=release ;;
+          esac
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "game_version=$(grep -oP 'minecraft_version=\K.*' gradle.properties)" >> "$GITHUB_OUTPUT"
 
       # The jarJar-ed "-all" jar is the distributable artifact (embeds okhttp/okio, reobfuscated).
@@ -115,7 +123,14 @@ jobs:
           name: AE2 Texture Updater ${{ steps.version.outputs.version }}
           version: ${{ steps.version.outputs.version }}
           changelog: ${{ steps.notes.outputs.body }}
+          channel: ${{ steps.version.outputs.channel }}
           loaders: forge
           game-versions: ${{ steps.version.outputs.game_version }}
           environment: client_only
+          # Required dependencies: Cloth Config API and Kotlin for Forge.
+          dependencies: |
+            [
+              {"project_id": "9s6osm5g", "dependency_type": "required"},
+              {"project_id": "ordsPcFz", "dependency_type": "required"}
+            ]
           files: ${{ steps.collect.outputs.jar }}
