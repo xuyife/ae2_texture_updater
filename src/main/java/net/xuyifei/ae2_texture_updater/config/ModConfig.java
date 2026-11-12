@@ -57,6 +57,17 @@ public class ModConfig implements ConfigData {
 
         @ConfigEntry.Gui.Tooltip
         public boolean debugMode = false;
+
+        @ConfigEntry.Gui.Tooltip
+        public boolean checkForUpdates = true;
+
+        /** Version the player chose to ignore; empty means nothing is ignored. */
+        @ConfigEntry.Gui.Excluded
+        public String ignoredVersion = "";
+
+        /** Epoch millis before which "later" keeps the notification hidden. */
+        @ConfigEntry.Gui.Excluded
+        public long snoozeUntil = 0L;
     }
 
     public static class Download {

@@ -149,10 +149,14 @@ public final class DownloadManager {
             String modId = array.get(i).getAsString();
             ModEntry entry = findEntry(config, modId);
 
-            ProgressMeter progress = StartupMessageManager.prependProgressBar("Getting " + modId + " download URL", 1);
-            UserMessageManager.info(MessageKey.GETTING_DOWNLOAD_URL, modId);
-            String url = resolveSingleUrl(config, entry, connectivity);
-            progress.complete();
+            ProgressMeter progress = StartupMessageManager.addProgressBar("Getting " + modId + " download URL", 1);
+            String url;
+            try {
+                UserMessageManager.info(MessageKey.GETTING_DOWNLOAD_URL, modId);
+                url = resolveSingleUrl(config, entry, connectivity);
+            } finally {
+                progress.complete();
+            }
 
             if (url.isEmpty()) {
                 LOGGER.error("Unable to get the download URL, skip!");
@@ -288,50 +292,55 @@ public final class DownloadManager {
      */
     private static boolean downloadSingle(String url, Path target, int threadCount, RateLimiter rateLimiter)
             throws IOException, InterruptedException {
-        ProgressMeter progress = StartupMessageManager.prependProgressBar(url, 100);
-
-        long fileSize = probeFileSize(url);
-        if (fileSize < 0) {
-            progress.complete();
-            return false;
-        }
-
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount);
-        AtomicLong downloadedBytes = new AtomicLong(0L);
-        AtomicBoolean failed = new AtomicBoolean(false);
-
-        startProgressReporter(progress, latch, downloadedBytes, fileSize);
-
-        long partSize = fileSize / threadCount;
-        for (int i = 0; i < threadCount; i++) {
-            long startByte = i * partSize;
-            long endByte = (i == threadCount - 1) ? fileSize - 1 : (i + 1) * partSize - 1;
-            int threadId = i;
-            executor.submit(() -> {
-                try {
-                    downloadChunk(url, startByte, endByte, target, downloadedBytes, rateLimiter, failed);
-                } catch (Exception e) {
-                    failed.set(true);
-                    LOGGER.error("Thread {} download failed, details: {}", threadId, e.getMessage());
-                    UserMessageManager.error(MessageKey.THREAD_DOWNLOAD_FAIL, threadId, e.getMessage());
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-
+        // Bars are drawn in deque order and only the first two are visible, so a sub task
+        // has to be pushed to the front: addProgressBar inserts at the head, while
+        // prependProgressBar appends to the tail and stays hidden behind the main bar.
+        ProgressMeter progress = StartupMessageManager.addProgressBar("Downloading " + fileName(url), 100);
         try {
-            latch.await();
-        } finally {
-            executor.shutdownNow();
-        }
+            long fileSize = probeFileSize(url);
+            if (fileSize < 0) {
+                return false;
+            }
 
-        boolean ok = !failed.get() && isComplete(target, fileSize);
-        if (ok) {
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch latch = new CountDownLatch(threadCount);
+            AtomicLong downloadedBytes = new AtomicLong(0L);
+            AtomicBoolean failed = new AtomicBoolean(false);
+
+            startProgressReporter(progress, latch, downloadedBytes, fileSize);
+
+            long partSize = fileSize / threadCount;
+            for (int i = 0; i < threadCount; i++) {
+                long startByte = i * partSize;
+                long endByte = (i == threadCount - 1) ? fileSize - 1 : (i + 1) * partSize - 1;
+                int threadId = i;
+                executor.submit(() -> {
+                    try {
+                        downloadChunk(url, startByte, endByte, target, downloadedBytes, rateLimiter, failed);
+                    } catch (Exception e) {
+                        failed.set(true);
+                        LOGGER.error("Thread {} download failed, details: {}", threadId, e.getMessage());
+                        UserMessageManager.error(MessageKey.THREAD_DOWNLOAD_FAIL, threadId, e.getMessage());
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+            }
+
+            try {
+                latch.await();
+            } finally {
+                executor.shutdownNow();
+            }
+
+            boolean ok = !failed.get() && isComplete(target, fileSize);
+            if (ok) {
+                progress.setAbsolute(100);
+            }
+            return ok;
+        } finally {
             progress.complete();
         }
-        return ok;
     }
 
     /** HEAD request returning the content length, or -1 if the size is unknown. */
@@ -436,6 +445,18 @@ public final class DownloadManager {
     }
 
     // --------------------------------------------------------------- helpers
+
+    /** Last path segment of a download URL, short enough to use as a progress bar label. */
+    private static String fileName(String url) {
+        String path = url;
+        int query = path.indexOf('?');
+        if (query >= 0) {
+            path = path.substring(0, query);
+        }
+        int slash = path.lastIndexOf('/');
+        String name = slash >= 0 ? path.substring(slash + 1) : path;
+        return name.isEmpty() ? "file" : name;
+    }
 
     private static boolean sleepQuietly(long millis) {
         try {

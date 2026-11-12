@@ -11,12 +11,14 @@ import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.config.ModConfig;
 import net.xuyifei.ae2_texture_updater.download.DownloadManager;
 import net.xuyifei.ae2_texture_updater.download.ModListManager;
+import net.xuyifei.ae2_texture_updater.gui.UpdateAvailableOverlay;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
 import net.xuyifei.ae2_texture_updater.update.ExtractionStep;
 import net.xuyifei.ae2_texture_updater.update.GuiMergeStep;
 import net.xuyifei.ae2_texture_updater.update.ModificationStep;
 import net.xuyifei.ae2_texture_updater.update.PackagingStep;
+import net.xuyifei.ae2_texture_updater.update.UpdateChecker;
 import net.xuyifei.ae2_texture_updater.update.UpdatePaths;
 import net.xuyifei.ae2_texture_updater.update.UpdatePipeline;
 import org.slf4j.Logger;
@@ -46,6 +48,25 @@ public class AE2TextureUpdater {
             StartupMessageManager.addModMessage("Since the trigger mode is selected to never trigger, the update will not be triggered this time");
             UserMessageManager.info(MessageKey.NOT_TRIGGERED);
         }
+
+        // Runs after the pipeline so the check never competes with the downloads for bandwidth.
+        if (CONFIG.general.checkForUpdates) {
+            UpdateChecker.addListener(AE2TextureUpdater::onVersionCheckResult);
+            UpdateChecker.checkAsync();
+        }
+    }
+
+    /** Called from the check thread once a result exists; the overlay only stores it. */
+    private static void onVersionCheckResult() {
+        UpdateChecker.Result result = UpdateChecker.result();
+        if (result != null && result.newer() && CONFIG.general.checkForUpdates) {
+            UpdateAvailableOverlay.announce(result);
+        }
+    }
+
+    /** Persists the config, used when the player's choice has to survive a restart. */
+    public static void saveConfig() {
+        AutoConfig.getConfigHolder(ModConfig.class).save();
     }
 
     private void registerConfig(FMLJavaModLoadingContext context) {

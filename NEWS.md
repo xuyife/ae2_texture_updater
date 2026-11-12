@@ -1,5 +1,18 @@
 # News
 
+## 0.3.3-beta
+
+### Added
+
+- **Automatic update check**: the mod now asks Modrinth for the newest published version after the texture update finishes, and tells you when a newer one exists. It is on by default and can be turned off with the "Check for Updates" option in the config
+- The notice is a small panel in the top-right corner of the screen. It stays out of your way — you can keep playing and every other click still reaches the game — and it is only dismissed when you choose one of its three buttons
+- **Download** opens the mod page, **Later** hides the notice for 3 days, and **Skip** never shows that particular version again (a newer release is still announced)
+
+### Fixed
+
+- The progress bars for individual downloads were hidden behind the main "Downloading Mods" bar, so you could only see the overall step; the file being downloaded is now shown on its own bar above it
+- A failed download no longer leaves a stale progress bar behind for the rest of the startup
+
 ## 0.3.2-beta
 
 ### Added

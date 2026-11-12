@@ -53,6 +53,14 @@
   "text.autoconfig.ae2_texture_updater.option.general.debugMode": "Debug模式",
   "text.autoconfig.ae2_texture_updater.option.general.debugMode.@Tooltip": "这将会输出更详细的日志",
 
+  "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates": "检查更新",
+  "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates.@Tooltip": "启动时检查本Mod是否有新版本，发现新版本时会在屏幕右上角提示",
+
+  "overlay.ae2_texture_updater.update_available.line": "发现新版本 %s",
+  "overlay.ae2_texture_updater.update_available.button.download": "下载",
+  "overlay.ae2_texture_updater.update_available.button.later": "稍后",
+  "overlay.ae2_texture_updater.update_available.button.ignore": "忽略",
+
   "text.autoconfig.ae2_texture_updater.option.download": "下载",
 
   "text.autoconfig.ae2_texture_updater.option.download.threads": "下载线程",

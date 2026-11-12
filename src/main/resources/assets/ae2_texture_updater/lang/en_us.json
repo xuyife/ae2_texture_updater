@@ -53,6 +53,14 @@
   "text.autoconfig.ae2_texture_updater.option.general.debugMode": "Debug Mode",
   "text.autoconfig.ae2_texture_updater.option.general.debugMode.@Tooltip": "Outputs more detailed logs",
 
+  "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates": "Check for Updates",
+  "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates.@Tooltip": "Check whether a newer version of this mod exists on startup; a newer release is announced in the top-right corner",
+
+  "overlay.ae2_texture_updater.update_available.line": "Version %s is available",
+  "overlay.ae2_texture_updater.update_available.button.download": "Get",
+  "overlay.ae2_texture_updater.update_available.button.later": "Later",
+  "overlay.ae2_texture_updater.update_available.button.ignore": "Skip",
+
   "text.autoconfig.ae2_texture_updater.option.download": "Download",
 
   "text.autoconfig.ae2_texture_updater.option.download.threads": "Download Threads",
