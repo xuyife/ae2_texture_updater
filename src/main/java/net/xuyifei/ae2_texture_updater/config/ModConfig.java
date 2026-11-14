@@ -55,6 +55,10 @@ public class ModConfig implements ConfigData {
         @ConfigEntry.Gui.Tooltip(count = 2)
         public ModIdMappingList modIdMapping = new ModIdMappingList();
 
+        @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
+        @ConfigEntry.Gui.Tooltip
+        public RunMode runMode = RunMode.STARTUP;
+
         @ConfigEntry.Gui.Tooltip
         public boolean debugMode = false;
 
@@ -345,6 +349,32 @@ public class ModConfig implements ConfigData {
         TriggerMode() {
             this.translationKey = TranslatableEnum.generateKey(
                     "general.triggerMode",
+                    this.name()
+            );
+        }
+
+        @Override
+        public String toString() {
+            return translatedOrDefault();
+        }
+
+        @Override
+        public String getTranslationKey() {
+            return translationKey;
+        }
+    }
+
+    public enum RunMode implements TranslatableEnum {
+        /** Run the pipeline while the game is still loading, as before. */
+        STARTUP,
+        /** Run it in the background once the client finished loading, with an in-game progress panel. */
+        BACKGROUND;
+
+        private final String translationKey;
+
+        RunMode() {
+            this.translationKey = TranslatableEnum.generateKey(
+                    "general.runMode",
                     this.name()
             );
         }

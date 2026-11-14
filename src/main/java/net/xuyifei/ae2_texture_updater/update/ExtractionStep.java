@@ -1,7 +1,6 @@
 package net.xuyifei.ae2_texture_updater.update;
 
 import net.minecraftforge.fml.StartupMessageManager;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
 import net.xuyifei.ae2_texture_updater.utils.FileUtil;
@@ -28,16 +27,16 @@ public final class ExtractionStep {
         this.paths = paths;
     }
 
-    public boolean run() {
+    public boolean run(UpdateReporter reporter) {
         if (!Files.isDirectory(paths.filesDir())) {
             return true; // nothing downloaded, nothing to extract
         }
 
-        ProgressMeter progress = StartupMessageManager.addProgressBar("3/5 Unzipping the Jar", 100);
+        UpdateReporter.Stage progress = reporter.stage("3/5 Unzipping the Jar", 100);
         UserMessageManager.info(MessageKey.UNZIP_JAR);
         LOGGER.info("Start Unzipping the Jar");
 
-        boolean ok = extractAll(progress);
+        boolean ok = extractAll(progress, reporter);
 
         progress.complete();
         LOGGER.info("Unzip the Jar Completed");
@@ -45,7 +44,7 @@ public final class ExtractionStep {
         return ok;
     }
 
-    private boolean extractAll(ProgressMeter progress) {
+    private boolean extractAll(UpdateReporter.Stage progress, UpdateReporter reporter) {
         Path extractedDir = paths.extractedDir();
         FileUtil.cleanDirectory(extractedDir);
 
@@ -58,7 +57,7 @@ public final class ExtractionStep {
                     .toList();
 
             for (Path jar : jars) {
-                if (!extractJar(jar, extractedDir, progress)) {
+                if (!extractJar(jar, extractedDir, progress, reporter)) {
                     return false;
                 }
             }
@@ -71,13 +70,14 @@ public final class ExtractionStep {
         }
     }
 
-    private boolean extractJar(Path jar, Path extractedDir, ProgressMeter progress) {
+    private boolean extractJar(Path jar, Path extractedDir, UpdateReporter.Stage progress, UpdateReporter reporter) {
         try {
             List<String> modDirs = JarExtractor.listSubDirectories(jar.toString(), "assets");
             modDirs.removeIf("minecraft"::equals);
             modDirs.removeIf(name -> isAssetlessAe2Addon(jar, name, progress));
 
             for (String modDir : modDirs) {
+                reporter.checkCancelled();
                 JarExtractor.extractJar(jar.toString(), "assets/" + modDir, extractedDir.toString());
             }
             return true;
@@ -93,7 +93,7 @@ public final class ExtractionStep {
      * A mod is skipped when its {@code assets/ae2} tree carries no textures, lang or models,
      * or when probing the jar fails (reported as an error by the caller of the probe).
      */
-    private boolean isAssetlessAe2Addon(Path jar, String name, ProgressMeter progress) {
+    private boolean isAssetlessAe2Addon(Path jar, String name, UpdateReporter.Stage progress) {
         if (!"ae2".equals(name)) {
             return false;
         }

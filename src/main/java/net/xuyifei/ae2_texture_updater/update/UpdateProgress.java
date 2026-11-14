@@ -1,31 +1,25 @@
 package net.xuyifei.ae2_texture_updater.update;
 
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
-
 /**
- * Thin facade over an FML {@link ProgressMeter} so steps can report percent
- * progress (0-100) without knowing the meter's internal step scale.
- * The scale guard avoids a NaN progress value when a meter was created with 0 steps.
+ * Thin facade over a {@link UpdateReporter.Stage} so steps can report percent
+ * progress (0-100) without knowing how the stage is rendered.
  */
 public final class UpdateProgress {
-    private final ProgressMeter meter;
-    private final int scale;
+    private final UpdateReporter.Stage stage;
 
-    public UpdateProgress(ProgressMeter meter, int scale) {
-        this.meter = meter;
-        this.scale = Math.max(1, scale);
+    public UpdateProgress(UpdateReporter.Stage stage) {
+        this.stage = stage;
     }
 
     public void setPercent(long percent) {
-        if (meter != null) {
-            meter.setAbsolute((int) (percent * scale / 100));
+        if (stage != null) {
+            stage.percent((int) Math.max(0, Math.min(100, percent)));
         }
     }
 
     public void complete() {
-        if (meter != null) {
-            meter.complete();
+        if (stage != null) {
+            stage.complete();
         }
     }
 }
-

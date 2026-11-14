@@ -6,21 +6,16 @@ import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.fml.StartupMessageManager;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.config.ModConfig;
-import net.xuyifei.ae2_texture_updater.download.DownloadManager;
-import net.xuyifei.ae2_texture_updater.download.ModListManager;
+import net.xuyifei.ae2_texture_updater.gui.BackgroundUpdateHandler;
 import net.xuyifei.ae2_texture_updater.gui.UpdateAvailableOverlay;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
-import net.xuyifei.ae2_texture_updater.update.ExtractionStep;
-import net.xuyifei.ae2_texture_updater.update.GuiMergeStep;
-import net.xuyifei.ae2_texture_updater.update.ModificationStep;
-import net.xuyifei.ae2_texture_updater.update.PackagingStep;
+import net.xuyifei.ae2_texture_updater.update.BackgroundUpdateState;
+import net.xuyifei.ae2_texture_updater.update.UpdateCancelledException;
 import net.xuyifei.ae2_texture_updater.update.UpdateChecker;
-import net.xuyifei.ae2_texture_updater.update.UpdatePaths;
-import net.xuyifei.ae2_texture_updater.update.UpdatePipeline;
+import net.xuyifei.ae2_texture_updater.update.UpdateReporter;
+import net.xuyifei.ae2_texture_updater.update.UpdateRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,18 +37,52 @@ public class AE2TextureUpdater {
         StartupMessageManager.addModMessage("AE2 Textures Updater");
         UserMessageManager.info(MessageKey.READY);
 
-        if (CONFIG.general.triggerMode != ModConfig.TriggerMode.NEVER) {
+        boolean startupMode = CONFIG.general.runMode == ModConfig.RunMode.STARTUP;
+        // Printed so a log always shows which mode actually took effect: a config file written
+        // before runMode existed silently falls back to STARTUP, which looks like the setting
+        // being ignored.
+        LOGGER.info("Run mode: {}, trigger mode: {}", CONFIG.general.runMode, CONFIG.general.triggerMode);
+        if (CONFIG.general.triggerMode != ModConfig.TriggerMode.NEVER && startupMode) {
             runUpdate();
-        } else {
+        } else if (CONFIG.general.triggerMode == ModConfig.TriggerMode.NEVER) {
             StartupMessageManager.addModMessage("Since the trigger mode is selected to never trigger, the update will not be triggered this time");
             UserMessageManager.info(MessageKey.NOT_TRIGGERED);
         }
+        // In background mode the pipeline is started from the title screen instead (see BackgroundUpdateHandler).
 
-        // Runs after the pipeline so the check never competes with the downloads for bandwidth.
-        if (CONFIG.general.checkForUpdates) {
-            UpdateChecker.addListener(AE2TextureUpdater::onVersionCheckResult);
-            UpdateChecker.checkAsync();
+        // Startup mode: the pipeline just finished, so the check cannot compete with downloads.
+        // Background mode: nothing has run yet, and a network call during loading is exactly what
+        // this mode is supposed to avoid — the check is started from the title screen instead.
+        if (startupMode) {
+            startVersionCheck();
         }
+    }
+
+    /** Registers the listener once and starts the version query on a daemon thread. */
+    public static void startVersionCheck() {
+        if (!CONFIG.general.checkForUpdates) {
+            return;
+        }
+        UpdateChecker.addListener(AE2TextureUpdater::onVersionCheckResult);
+        UpdateChecker.checkAsync();
+    }
+
+    /** Runs the pipeline on a daemon thread with progress reported to the corner panel. */
+    public static void runInBackground() {
+        BackgroundUpdateState.begin();
+        Thread thread = new Thread(() -> {
+            UpdateRunner.Outcome outcome;
+            try {
+                outcome = UpdateRunner.run(new BackgroundUpdateState.Reporter());
+            } catch (UpdateCancelledException e) {
+                outcome = UpdateRunner.Outcome.CANCELLED;
+            } finally {
+                BackgroundUpdateState.finish();
+            }
+            BackgroundUpdateHandler.onRunFinished(outcome);
+        }, "ae2-texture-updater-background");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /** Called from the check thread once a result exists; the overlay only stores it. */
@@ -78,58 +107,10 @@ public class AE2TextureUpdater {
     }
 
     private static void runUpdate() {
-        ProgressMeter progress1 = StartupMessageManager.addProgressBar("1/5 Scanning Mods", 1);
-        UserMessageManager.info(MessageKey.CHECK_MODLIST);
-        LOGGER.info("Start Scanning Mods");
-
-        boolean needUpdate = ModListManager.scanMods();
-        progress1.complete();
-        LOGGER.info("Scan Mods Completed");
-        UserMessageManager.info(MessageKey.CHECK_MODLIST_COMPLETE);
-
-        boolean triggered = needUpdate && CONFIG.general.triggerMode == ModConfig.TriggerMode.ON_MOD_CHANGE
-                || CONFIG.general.triggerMode == ModConfig.TriggerMode.ON_STARTUP;
-        if (!triggered) {
+        UpdateRunner.Outcome outcome = UpdateRunner.run(new UpdateReporter.Startup());
+        if (outcome == UpdateRunner.Outcome.SKIPPED) {
             StartupMessageManager.addModMessage("No changes were found in the mod environment or errors occurred during detection");
             UserMessageManager.info(MessageKey.NOT_TRIGGERED);
-            return;
         }
-
-        UserMessageManager.info(MessageKey.HAS_BEEN_TRIGGERED);
-        UpdatePaths paths = new UpdatePaths();
-        UpdatePipeline pipeline = new UpdatePipeline();
-
-        pipeline.run(MessageKey.ERROR_ON_EXTRACTED_JAR,
-                () -> download() && new ExtractionStep(paths).run());
-        pipeline.run(MessageKey.ERROR_ON_MODIFY_CONTENT,
-                () -> new ModificationStep(paths).run());
-        pipeline.run(MessageKey.ERROR_ON_GUI_MERGE,
-                () -> new GuiMergeStep(paths).run(guiMergeProgress()));
-        pipeline.run(MessageKey.UNABLE_TO_PACKING_FILES,
-                () -> new PackagingStep(paths, FMLPaths.GAMEDIR.get().resolve("resourcepacks")).run());
-    }
-
-    /** Main progress meter for the GUI merge step (download progress reports onto it). */
-    private static ProgressMeter guiMergeProgress() {
-        return StartupMessageManager.addProgressBar("GUI Repair Layer", 100);
-    }
-
-    private static boolean download() {
-        ProgressMeter progress2 = StartupMessageManager.addProgressBar("2/5 Downloading Mods", 100);
-        UserMessageManager.info(MessageKey.START_DOWNLOAD_MODS);
-        LOGGER.info("Start Downloading Mods");
-
-        boolean canContinue = DownloadManager.startDownload(progress2);
-
-        LOGGER.info("Download Mods Completed");
-        UserMessageManager.info(MessageKey.DOWNLOAD_MODS_COMPLETE);
-        progress2.complete();
-
-        if (!canContinue) {
-            StartupMessageManager.addModMessage("Download Mods failed!");
-            UserMessageManager.error(MessageKey.DOWNLOAD_MODS_FAILED);
-            return false;
-        }
-        return true;
     }
 }

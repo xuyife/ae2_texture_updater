@@ -10,6 +10,7 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
+import net.xuyifei.ae2_texture_updater.config.ModConfig;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
 
 /**
@@ -29,6 +30,11 @@ public final class UpdateResultToastHandler {
     @SubscribeEvent
     public static void onTitleScreenInit(ScreenEvent.Init event) {
         if (toastShown || !(event.getScreen() instanceof TitleScreen)) {
+            return;
+        }
+        // Background mode reports its own outcome once the run finishes; at this point
+        // nothing has run yet, so the startup summary would only be stale noise.
+        if (AE2TextureUpdater.CONFIG.general.runMode != ModConfig.RunMode.STARTUP) {
             return;
         }
         toastShown = true;

@@ -1,10 +1,10 @@
 package net.xuyifei.ae2_texture_updater.download;
 
 import com.google.common.util.concurrent.RateLimiter;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
 import net.xuyifei.ae2_texture_updater.config.ModConfig;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
+import net.xuyifei.ae2_texture_updater.update.UpdateReporter;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
 import net.xuyifei.ae2_texture_updater.utils.FileUtil;
 import net.xuyifei.ae2_texture_updater.utils.HttpClient;
@@ -67,7 +67,7 @@ public final class GuiPackDownloader {
      * directory with the unpacked pack, or {@code null} when the layer is
      * disabled or nothing could be obtained (caller skips the merge step).
      */
-    public Path downloadAndExtract(ProgressMeter mainProgress) {
+    public Path downloadAndExtract(UpdateReporter.Stage mainProgress) {
         ModConfig.GuiMerge cfg = AE2TextureUpdater.CONFIG.guiMerge;
         if (!cfg.enabled) {
             UserMessageManager.info(MessageKey.GUI_PACK_SKIPPED_DISABLED);
@@ -130,7 +130,7 @@ public final class GuiPackDownloader {
      * strategy as {@code DownloadManager}. Progress goes straight onto the main meter.
      */
     @SuppressWarnings("UnstableApiUsage")
-    private boolean downloadMultiThreaded(String url, ProgressMeter mainProgress) {
+    private boolean downloadMultiThreaded(String url, UpdateReporter.Stage mainProgress) {
         long fileSize = probeFileSize(url);
         if (fileSize <= 0) {
             return false;
@@ -160,7 +160,7 @@ public final class GuiPackDownloader {
         Thread reporter = new Thread(() -> {
             while (latch.getCount() > 0) {
                 if (mainProgress != null) {
-                    mainProgress.setAbsolute((int) (downloadedBytes.get() * 100 / fileSize));
+                    mainProgress.percent((int) (downloadedBytes.get() * 100 / fileSize));
                 }
                 try {
                     Thread.sleep(1000);
@@ -273,7 +273,7 @@ public final class GuiPackDownloader {
     // ---------------------------------------------------------------- extract
 
     /** Unpacks the cached zip with zip-slip protection. Returns the unpack dir. */
-    private Path extractCached(ProgressMeter mainProgress) {
+    private Path extractCached(UpdateReporter.Stage mainProgress) {
         UserMessageManager.info(MessageKey.GUI_PACK_EXTRACTING);
         try {
             FileUtil.deleteDirectory(unpackDir);
@@ -316,7 +316,7 @@ public final class GuiPackDownloader {
     // ---------------------------------------------------------------- fallback
 
     /** When a fresh download failed, fall back to the previously cached zip if usable. */
-    private Path fallbackToCache(ProgressMeter mainProgress, String expectedSha1) {
+    private Path fallbackToCache(UpdateReporter.Stage mainProgress, String expectedSha1) {
         if (!Files.isRegularFile(zipPath)) {
             UserMessageManager.error(MessageKey.GUI_PACK_DOWNLOAD_FAILED);
             return null;

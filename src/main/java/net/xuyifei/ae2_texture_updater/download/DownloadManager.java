@@ -4,12 +4,13 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
 import net.minecraftforge.fml.StartupMessageManager;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
 import net.xuyifei.ae2_texture_updater.config.ModConfig;
 import net.xuyifei.ae2_texture_updater.config.entry.ModEntry;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
+import net.xuyifei.ae2_texture_updater.update.UpdateCancelledException;
+import net.xuyifei.ae2_texture_updater.update.UpdateReporter;
 import net.xuyifei.ae2_texture_updater.utils.HttpClient;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -45,36 +46,33 @@ public final class DownloadManager {
     private DownloadManager() {
     }
 
-    public static boolean startDownload(ProgressMeter mainProgress) {
+    public static boolean startDownload(UpdateReporter reporter) {
         ModConfig config = AE2TextureUpdater.CONFIG;
         Path modsFilePath = ModListManager.CACHE_DIR.resolve("to_update_mods.json");
-        Connectivity connectivity = Connectivity.detect(config, mainProgress);
+        Connectivity connectivity = Connectivity.detect(config, reporter);
         if (connectivity == null) {
             return false;
         }
 
         List<String> urls;
         try {
-            urls = resolveUrls(config, modsFilePath, connectivity);
+            urls = resolveUrls(config, modsFilePath, connectivity, reporter);
         } catch (IOException e) {
             LOGGER.error("An error occurred during the transfer, details: {}", e.getMessage());
             UserMessageManager.error(MessageKey.UNKNOWN_ERROR, e.getMessage());
-            mainProgress.complete();
             return false;
         }
         if (urls == null || urls.isEmpty()) {
-            mainProgress.complete();
             return false;
         }
 
-        mainProgress.setAbsolute(50);
         try {
-            downloadMods(urls);
+            downloadMods(urls, reporter);
+        } catch (UpdateCancelledException e) {
+            throw e;
         } catch (Exception e) {
             LOGGER.error("An unknown error occurred, details: {}", e.getMessage());
             UserMessageManager.error(MessageKey.UNKNOWN_ERROR, e.getMessage());
-        } finally {
-            mainProgress.complete();
         }
         return true;
     }
@@ -84,7 +82,7 @@ public final class DownloadManager {
     /** Probe result for the two mod platforms; {@code null} from {@link #detect} means "abort the whole update". */
     private record Connectivity(boolean curseForge, boolean modrinth) {
 
-        static Connectivity detect(ModConfig config, ProgressMeter mainProgress) {
+        static Connectivity detect(ModConfig config, UpdateReporter reporter) {
             if (!config.download.check_connectivity) {
                 return new Connectivity(true, true);
             }
@@ -93,9 +91,9 @@ public final class DownloadManager {
 
             OkHttpClient client = HttpClient.getInstance();
             boolean cf = probe(client, "https://api.curseforge.com/",
-                    MessageKey.SUCCESS_CONNECT_TO_CURSEFORGE, MessageKey.FAIL_CONNECT_TO_CURSEFORGE, mainProgress);
+                    MessageKey.SUCCESS_CONNECT_TO_CURSEFORGE, MessageKey.FAIL_CONNECT_TO_CURSEFORGE, reporter);
             boolean mr = probe(client, "https://api.modrinth.com/",
-                    MessageKey.SUCCESS_CONNECT_TO_MODRINTH, MessageKey.FAIL_CONNECT_TO_MODRINTH, mainProgress);
+                    MessageKey.SUCCESS_CONNECT_TO_MODRINTH, MessageKey.FAIL_CONNECT_TO_MODRINTH, reporter);
             if (!cf && !mr) {
                 LOGGER.error("Unable to connect to CurseForge API and Modrinth API, terminate task!");
                 StartupMessageManager.addModMessage("Unable to connect to CurseForge API and Modrinth API, terminate task!");
@@ -107,7 +105,7 @@ public final class DownloadManager {
         }
 
         private static boolean probe(OkHttpClient client, String url,
-                                     MessageKey successKey, MessageKey failKey, ProgressMeter mainProgress) {
+                                     MessageKey successKey, MessageKey failKey, UpdateReporter reporter) {
             Request request = new Request.Builder().url(url).build();
             try (Response response = client.newCall(request).execute()) {
                 if (response.isSuccessful()) {
@@ -123,7 +121,6 @@ public final class DownloadManager {
                 LOGGER.error("Error on checking network connection, detail: {}", e.getMessage());
                 StartupMessageManager.addModMessage("Error on checking network connection");
                 UserMessageManager.error(MessageKey.CHECKING_NETWORK_ERR, e.getMessage());
-                mainProgress.complete();
                 return false;
             }
         }
@@ -136,7 +133,13 @@ public final class DownloadManager {
      * download URL per mod. Returns {@code null} when there is nothing to do.
      */
     private static List<String> resolveUrls(ModConfig config, Path modsFilePath,
-                                            Connectivity connectivity) throws IOException {
+                                            Connectivity connectivity, UpdateReporter reporter) throws IOException {
+        if (!Files.isRegularFile(modsFilePath)) {
+            // Should not happen: ModListManager always writes it before this step runs.
+            LOGGER.error("The pending-mod list is missing: {}", modsFilePath);
+            UserMessageManager.error(MessageKey.UNKNOWN_ERROR, modsFilePath.toString());
+            return null;
+        }
         JsonArray array = JsonParser.parseString(Files.readString(modsFilePath)).getAsJsonArray();
         if (array == null || array.isEmpty()) {
             StartupMessageManager.addModMessage("No Mods to update");
@@ -149,7 +152,8 @@ public final class DownloadManager {
             String modId = array.get(i).getAsString();
             ModEntry entry = findEntry(config, modId);
 
-            ProgressMeter progress = StartupMessageManager.addProgressBar("Getting " + modId + " download URL", 1);
+            reporter.checkCancelled();
+            UpdateReporter.Stage progress = reporter.stage("Getting " + modId + " download URL", 1);
             String url;
             try {
                 UserMessageManager.info(MessageKey.GETTING_DOWNLOAD_URL, modId);
@@ -254,7 +258,8 @@ public final class DownloadManager {
 
     // -------------------------------------------------------------- download
 
-    private static void downloadMods(List<String> urls) throws IOException, InterruptedException {
+    private static void downloadMods(List<String> urls, UpdateReporter reporter)
+            throws IOException, InterruptedException {
         Path filesDir = ModListManager.CACHE_DIR.resolve("files");
         Files.createDirectories(filesDir);
         clearDirectory(filesDir);
@@ -263,8 +268,9 @@ public final class DownloadManager {
         RateLimiter rateLimiter = createRateLimiter();
 
         for (String url : urls) {
+            reporter.checkCancelled();
             Path target = filesDir.resolve(DOWNLOAD_PREFIX + System.currentTimeMillis() + ".jar");
-            if (!downloadSingle(url, target, threadCount, rateLimiter)) {
+            if (!downloadSingle(url, target, threadCount, rateLimiter, reporter)) {
                 Files.deleteIfExists(target);
             }
         }
@@ -290,12 +296,12 @@ public final class DownloadManager {
      * GET per thread chunk. Returns {@code false} when the file was not fully
      * downloaded (caller deletes the partial file).
      */
-    private static boolean downloadSingle(String url, Path target, int threadCount, RateLimiter rateLimiter)
-            throws IOException, InterruptedException {
+    private static boolean downloadSingle(String url, Path target, int threadCount, RateLimiter rateLimiter,
+                                          UpdateReporter reporter) throws IOException, InterruptedException {
         // Bars are drawn in deque order and only the first two are visible, so a sub task
         // has to be pushed to the front: addProgressBar inserts at the head, while
         // prependProgressBar appends to the tail and stays hidden behind the main bar.
-        ProgressMeter progress = StartupMessageManager.addProgressBar("Downloading " + fileName(url), 100);
+        UpdateReporter.Stage progress = reporter.stage("Downloading " + fileName(url), 100);
         try {
             long fileSize = probeFileSize(url);
             if (fileSize < 0) {
@@ -307,7 +313,7 @@ public final class DownloadManager {
             AtomicLong downloadedBytes = new AtomicLong(0L);
             AtomicBoolean failed = new AtomicBoolean(false);
 
-            startProgressReporter(progress, latch, downloadedBytes, fileSize);
+            startProgressReporter(progress, latch, downloadedBytes, fileSize, reporter);
 
             long partSize = fileSize / threadCount;
             for (int i = 0; i < threadCount; i++) {
@@ -316,7 +322,10 @@ public final class DownloadManager {
                 int threadId = i;
                 executor.submit(() -> {
                     try {
-                        downloadChunk(url, startByte, endByte, target, downloadedBytes, rateLimiter, failed);
+                        downloadChunk(url, startByte, endByte, target, downloadedBytes, rateLimiter, failed, reporter);
+                    } catch (UpdateCancelledException e) {
+                        // The player cancelled: stay quiet, the caller clears the cache.
+                        failed.set(true);
                     } catch (Exception e) {
                         failed.set(true);
                         LOGGER.error("Thread {} download failed, details: {}", threadId, e.getMessage());
@@ -332,10 +341,11 @@ public final class DownloadManager {
             } finally {
                 executor.shutdownNow();
             }
+            reporter.checkCancelled();
 
             boolean ok = !failed.get() && isComplete(target, fileSize);
             if (ok) {
-                progress.setAbsolute(100);
+                progress.percent(100);
             }
             return ok;
         } finally {
@@ -362,12 +372,16 @@ public final class DownloadManager {
         }
     }
 
-    private static void startProgressReporter(ProgressMeter progress, CountDownLatch latch,
-                                              AtomicLong downloadedBytes, long fileSize) {
-        Thread reporter = new Thread(() -> {
+    private static void startProgressReporter(UpdateReporter.Stage progress, CountDownLatch latch,
+                                              AtomicLong downloadedBytes, long fileSize,
+                                              UpdateReporter reporter) {
+        Thread progressThread = new Thread(() -> {
             while (latch.getCount() > 0) {
                 long downloaded = downloadedBytes.get();
-                progress.setAbsolute((int) (downloaded * 100 / fileSize));
+                progress.percent((int) (downloaded * 100 / fileSize));
+                if (reporter.isCancelled()) {
+                    return;
+                }
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
@@ -376,13 +390,13 @@ public final class DownloadManager {
                 }
             }
         }, "ae2-texture-updater-progress");
-        reporter.setDaemon(true);
-        reporter.start();
+        progressThread.setDaemon(true);
+        progressThread.start();
     }
 
     private static void downloadChunk(String url, long startByte, long endByte, Path target,
-                                      AtomicLong downloadedBytes, RateLimiter rateLimiter, AtomicBoolean failed)
-            throws IOException {
+                                      AtomicLong downloadedBytes, RateLimiter rateLimiter, AtomicBoolean failed,
+                                      UpdateReporter reporter) throws IOException {
         Request request = new Request.Builder()
                 .url(url)
                 .header("Range", "bytes=" + startByte + "-" + endByte)
@@ -407,6 +421,9 @@ public final class DownloadManager {
                 byte[] buffer = new byte[BUFFER_SIZE];
                 int len;
                 while ((len = inputStream.read(buffer)) != -1) {
+                    if (reporter.isCancelled()) {
+                        throw new UpdateCancelledException();
+                    }
                     if (rateLimiter != null) {
                         rateLimiter.acquire(len);
                     }

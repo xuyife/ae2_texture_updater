@@ -59,17 +59,16 @@ public final class GuiMergeStep {
      * unavailable — a missing GUI layer is a warning, never a pipeline failure.
      * The meter is completed here when the step finishes.
      */
-    public boolean run(net.minecraftforge.fml.loading.progress.ProgressMeter mainProgress) {
+    public boolean run(UpdateReporter reporter) {
+        UpdateReporter.Stage mainProgress = reporter.stage("GUI Repair Layer", 100);
         try {
             return runInternal(mainProgress);
         } finally {
-            if (mainProgress != null) {
-                mainProgress.complete();
-            }
+            mainProgress.complete();
         }
     }
 
-    private boolean runInternal(net.minecraftforge.fml.loading.progress.ProgressMeter mainProgress) {
+    private boolean runInternal(UpdateReporter.Stage mainProgress) {
         if (!AE2TextureUpdater.CONFIG.guiMerge.enabled) {
             UserMessageManager.info(MessageKey.GUI_PACK_SKIPPED_DISABLED);
             return true;

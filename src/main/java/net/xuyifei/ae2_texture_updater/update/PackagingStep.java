@@ -3,7 +3,6 @@ package net.xuyifei.ae2_texture_updater.update;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import net.minecraftforge.fml.StartupMessageManager;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.message.MessageKey;
 import net.xuyifei.ae2_texture_updater.message.UserMessageManager;
 import org.slf4j.Logger;
@@ -13,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.FileVisitResult;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -38,18 +38,34 @@ public final class PackagingStep {
         this.resourcePacksDir = resourcePacksDir;
     }
 
-    public boolean run() {
+    public boolean run(UpdateReporter reporter) {
         if (!Files.isDirectory(paths.extractedDir())) {
             StartupMessageManager.addModMessage("Error unzipping Jar");
             UserMessageManager.error(MessageKey.ERROR_ON_EXTRACTED_JAR);
             return false;
         }
 
-        ProgressMeter progress = StartupMessageManager.addProgressBar("5/5 Packaging Files", 100);
+        UpdateReporter.Stage progress = reporter.stage("5/5 Packaging Files", 100);
         UserMessageManager.info(MessageKey.PACK_RESOURCEPACK);
         LOGGER.info("Start Packaging Files");
 
-        boolean ok = packageFiles(progress);
+        // Unloading and restoring the pack both reload all resources, which interrupts play.
+        // Only ask when a reload would actually happen, and only in the background mode where
+        // the player is likely mid-game.
+        Path packFile = resourcePacksDir.resolve(PACK_FILE_NAME);
+        boolean needsReload = ResourcePackGate.wouldReload(packFile);
+        if (needsReload && BackgroundUpdateState.status() == BackgroundUpdateState.Status.RUNNING) {
+            ResourcePackPrompt.askAndWait();
+        }
+
+        // The installed pack is held open while enabled; drop it before the file is replaced.
+        List<String> releasedPack = ResourcePackGate.release(packFile);
+        boolean ok;
+        try {
+            ok = packageFiles(progress, reporter);
+        } finally {
+            ResourcePackGate.restore(releasedPack);
+        }
 
         if (ok) {
             LOGGER.info("Package Files Completed");
@@ -59,7 +75,7 @@ public final class PackagingStep {
         return ok;
     }
 
-    private boolean packageFiles(ProgressMeter progress) {
+    private boolean packageFiles(UpdateReporter.Stage progress, UpdateReporter reporter) {
         Path assetsPath = paths.extractedDir();
         try {
             Files.createDirectories(paths.cacheDir());
@@ -71,7 +87,7 @@ public final class PackagingStep {
                     LOGGER.warn("extracted directory not found: {}", assetsPath);
                     return false;
                 }
-                zipTree(zos, assetsPath);
+                zipTree(zos, assetsPath, reporter);
             }
 
             return installPack(progress);
@@ -81,6 +97,34 @@ public final class PackagingStep {
             progress.complete();
             return false;
         }
+    }
+
+    /**
+     * Replaces the installed pack, retrying briefly.
+     *
+     * <p>{@link ResourcePackGate} already released the pack, but on Windows a handle can
+     * linger for a moment after a reload (antivirus or the file indexer touching the file).
+     * A short retry turns that race into a success instead of a failed update.</p>
+     */
+    private void replacePackFile(Path target) throws IOException {
+        IOException last = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                Files.deleteIfExists(target);
+                Files.copy(paths.packZip(), target);
+                return;
+            } catch (IOException e) {
+                last = e;
+                LOGGER.warn("Unable to replace the resource pack (attempt {}): {}", attempt + 1, e.getMessage());
+                try {
+                    Thread.sleep(400L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        throw last != null ? last : new IOException("unable to replace " + target);
     }
 
     private static void writePackMetadata(ZipOutputStream zos) throws IOException {
@@ -101,7 +145,7 @@ public final class PackagingStep {
         zos.closeEntry();
     }
 
-    private static void zipTree(ZipOutputStream zos, Path assetsPath) throws IOException {
+    private static void zipTree(ZipOutputStream zos, Path assetsPath, UpdateReporter reporter) throws IOException {
         Files.walkFileTree(assetsPath, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
@@ -116,6 +160,7 @@ public final class PackagingStep {
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                reporter.checkCancelled();
                 String entryName = "assets/" + assetsPath.relativize(file).toString().replace('\\', '/');
                 ZipEntry entry = new ZipEntry(entryName);
                 entry.setLastModifiedTime(Files.getLastModifiedTime(file));
@@ -135,7 +180,7 @@ public final class PackagingStep {
         });
     }
 
-    private boolean installPack(ProgressMeter progress) {
+    private boolean installPack(UpdateReporter.Stage progress) {
         if (!Files.exists(paths.packZip())) {
             LOGGER.warn("Unable to package files");
             UserMessageManager.error(MessageKey.UNABLE_TO_PACKING_FILES);
@@ -144,8 +189,7 @@ public final class PackagingStep {
         try {
             Files.createDirectories(resourcePacksDir);
             Path target = resourcePacksDir.resolve(PACK_FILE_NAME);
-            Files.deleteIfExists(target);
-            Files.copy(paths.packZip(), target);
+            replacePackFile(target);
             return true;
         } catch (IOException e) {
             UserMessageManager.error(MessageKey.UNKNOWN_ERROR, e.getMessage());

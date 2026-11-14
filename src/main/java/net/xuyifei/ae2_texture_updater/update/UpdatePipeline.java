@@ -17,6 +17,9 @@ public final class UpdatePipeline {
     /**
      * Executes {@code step}; when it reports failure (or throws) the pipeline
      * records the failure key and skips all later steps.
+     *
+     * <p>{@link UpdateCancelledException} is not a failure: it propagates so the
+     * caller can clear the cache, and it never writes a user-visible error.</p>
      */
     public boolean run(MessageKey failureKey, BooleanSupplier step) {
         if (aborted) {
@@ -28,6 +31,8 @@ public final class UpdatePipeline {
                 aborted = true;
             }
             return ok;
+        } catch (UpdateCancelledException e) {
+            throw e;
         } catch (Exception e) {
             LOGGER.error("Update step failed: {}", e.getMessage(), e);
             UserMessageManager.error(MessageKey.UNKNOWN_ERROR, e.getMessage());
@@ -37,10 +42,14 @@ public final class UpdatePipeline {
         }
     }
 
+    /** Whether any step failed, so the caller can report a failure instead of a success. */
+    public boolean failed() {
+        return aborted;
+    }
+
     /** A step that either succeeds, fails with its own user message, or throws. */
     @FunctionalInterface
     public interface BooleanSupplier {
         boolean getAsBoolean();
     }
 }
-

@@ -52,6 +52,10 @@
 
   "text.autoconfig.ae2_texture_updater.option.general.debugMode": "Debug Mode",
   "text.autoconfig.ae2_texture_updater.option.general.debugMode.@Tooltip": "Outputs more detailed logs",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode": "Run Mode",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode.@Tooltip": "Update while the game is loading, or in the background once loading finished",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode.enum.STARTUP": "During Startup",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode.enum.BACKGROUND": "In Background",
 
   "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates": "Check for Updates",
   "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates.@Tooltip": "Check whether a newer version of this mod exists on startup; a newer release is announced in the top-right corner",
@@ -264,5 +268,30 @@
   "screen.ae2_texture_updater.log_archive.message.extract_failed": "Failed to read the archived log",
 
   "toast.ae2_texture_updater.update_problems.title": "AE2 Texture Updater",
-  "toast.ae2_texture_updater.update_problems.detail": "%s error(s), %s warning(s) during this update. Check the logs for details."
+  "toast.ae2_texture_updater.update_problems.detail": "%s error(s), %s warning(s) during this update. Check the logs for details.",
+
+  "overlay.ae2_texture_updater.background.step": "Step: %s",
+  "overlay.ae2_texture_updater.background.button.cancel": "Cancel",
+  "overlay.ae2_texture_updater.background.button.hide": "Hide",
+
+  "toast.ae2_texture_updater.background.title": "AE2 Texture Updater",
+  "toast.ae2_texture_updater.background.success": "Background update finished with %s error(s) and %s warning(s)",
+  "toast.ae2_texture_updater.background.failed": "Background update failed. Check the logs for details",
+
+  "overlay.ae2_texture_updater.reload_prompt.line1": "The resource pack has to be unloaded and reloaded to finish the update.",
+  "overlay.ae2_texture_updater.reload_prompt.line2": "You may see 2 resource loading animations while this happens.",
+  "overlay.ae2_texture_updater.reload_prompt.line3": "Continue?",
+
+  "overlay.ae2_texture_updater.reload_prompt.button.continue": "Continue",
+  "overlay.ae2_texture_updater.reload_prompt.button.later": "Later",
+  "overlay.ae2_texture_updater.reload_prompt.button.cancel": "Cancel",
+
+  "overlay.ae2_texture_updater.reload_prompt.snoozed": "Snoozed: asking again in %s s",
+
+  "chat.ae2_texture_updater.reload_prompt.line": "[AE2 Texture Updater] The pack has to be unloaded and reloaded to finish this update; you will see 2 loading animations. Choose:",
+  "chat.ae2_texture_updater.reload_prompt.button.continue": "[Continue]",
+  "chat.ae2_texture_updater.reload_prompt.button.later": "[Later]",
+  "chat.ae2_texture_updater.reload_prompt.button.cancel": "[Cancel]",
+  "chat.ae2_texture_updater.reload_prompt.hover": "Click to apply this choice",
+  "screen.ae2_texture_updater.reload_prompt.title": "AE2 Texture Updater needs to reload resources"
 }

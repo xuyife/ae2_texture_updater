@@ -1,5 +1,19 @@
 # News
 
+## 0.3.4-beta
+
+### Added
+
+- **Run the update in the background**: the config has a new "Run Mode" option. Keep "During Startup" for the old behaviour, or pick "In Background" to let the game finish loading first and do the texture update while you play
+- The background run shows a small progress panel in the top-right corner with the current step and a progress bar, plus **Cancel** and **Hide** buttons. Hiding closes the panel but the run continues; cancelling stops it and clears the temporary files of that run (the cached GUI pack is kept)
+- When the run finishes — completed or failed — a toast tells you the result, whether or not you hid the panel. Cancelling stays silent, since you asked for it
+- **Reload confirmation**: replacing the texture pack makes the game unload and reload resources, so the mod now asks first instead of interrupting you. In a world the question arrives in chat with clickable **[Continue] [Later] [Cancel]**; on a menu it uses a normal screen. "Later" asks again after 5 minutes, "Cancel" stops the update
+
+### Fixed
+
+- Cancelling an update then starting another one in the same session failed with a file error, because the list of mods to download was never regenerated. It is rebuilt now
+- Replacing the texture pack while it was enabled failed on Windows with "another program is using this file"; the pack is now unloaded before writing and re-enabled afterwards, so the new textures also appear immediately without restarting
+
 ## 0.3.3-beta
 
 ### Added

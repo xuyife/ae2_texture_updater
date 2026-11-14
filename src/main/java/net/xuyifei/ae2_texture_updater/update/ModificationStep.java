@@ -1,7 +1,6 @@
 package net.xuyifei.ae2_texture_updater.update;
 
 import net.minecraftforge.fml.StartupMessageManager;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
 import net.xuyifei.ae2_texture_updater.config.entry.AddContentEntry;
 import net.xuyifei.ae2_texture_updater.config.entry.DeleteContentEntry;
@@ -46,7 +45,7 @@ public final class ModificationStep {
         this.paths = paths;
     }
 
-    public boolean run() {
+    public boolean run(UpdateReporter reporter) {
         if (!Files.isDirectory(paths.extractedDir())) {
             UserMessageManager.warning(MessageKey.NO_EXTRACTED_MOD_FOUND);
             LOGGER.warn("Could not find extracted mods directory");
@@ -64,16 +63,22 @@ public final class ModificationStep {
             return false;
         }
 
-        ProgressMeter progress = StartupMessageManager.addProgressBar("4/5 Modifying Mods", 100);
-        UpdateProgress percent = new UpdateProgress(progress, progress.steps() == 0 ? 1 : progress.steps());
+        UpdateReporter.Stage progress = reporter.stage("4/5 Modifying Mods", 100);
+        UpdateProgress percent = new UpdateProgress(progress);
         UserMessageManager.info(MessageKey.MODIFY_CONTENT);
         LOGGER.info("Start Modifying Mods");
 
-        boolean ok = cleanupDirs(percent)
-                && addContent(percent)
-                && modifyContent(percent)
-                && deleteContent(percent)
-                && mapModIds(percent);
+        boolean ok = true;
+        for (java.util.function.Function<UpdateProgress, Boolean> subStep :
+                java.util.List.<java.util.function.Function<UpdateProgress, Boolean>>of(
+                        this::cleanupDirs, this::addContent, this::modifyContent,
+                        this::deleteContent, this::mapModIds)) {
+            reporter.checkCancelled();
+            if (!subStep.apply(percent)) {
+                ok = false;
+                break;
+            }
+        }
 
         if (ok) {
             LOGGER.info("Modify Mods Completed");

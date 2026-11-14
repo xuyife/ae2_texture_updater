@@ -52,6 +52,10 @@
 
   "text.autoconfig.ae2_texture_updater.option.general.debugMode": "Debug模式",
   "text.autoconfig.ae2_texture_updater.option.general.debugMode.@Tooltip": "这将会输出更详细的日志",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode": "执行方式",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode.@Tooltip": "选择在游戏启动时进行更新，还是等游戏加载完成后在后台进行",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode.enum.STARTUP": "启动阶段",
+  "text.autoconfig.ae2_texture_updater.option.general.runMode.enum.BACKGROUND": "后台进行",
 
   "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates": "检查更新",
   "text.autoconfig.ae2_texture_updater.option.general.checkForUpdates.@Tooltip": "启动时检查本Mod是否有新版本，发现新版本时会在屏幕右上角提示",
@@ -264,5 +268,30 @@
   "screen.ae2_texture_updater.log_archive.message.extract_failed": "读取该历史日志失败",
 
   "toast.ae2_texture_updater.update_problems.title": "AE2材质更新器",
-  "toast.ae2_texture_updater.update_problems.detail": "本次更新出现 %s 个错误、%s 个警告，详细信息请前往日志查看。"
+  "toast.ae2_texture_updater.update_problems.detail": "本次更新出现 %s 个错误、%s 个警告，详细信息请前往日志查看。",
+
+  "overlay.ae2_texture_updater.background.step": "步骤：%s",
+  "overlay.ae2_texture_updater.background.button.cancel": "取消",
+  "overlay.ae2_texture_updater.background.button.hide": "隐藏",
+
+  "toast.ae2_texture_updater.background.title": "AE2材质更新器",
+  "toast.ae2_texture_updater.background.success": "后台更新已完成，出现 %s 个错误、%s 个警告",
+  "toast.ae2_texture_updater.background.failed": "后台更新失败，详细信息请前往日志查看",
+
+  "overlay.ae2_texture_updater.reload_prompt.line1": "需要卸载和重加载材质才能完成更新，",
+  "overlay.ae2_texture_updater.reload_prompt.line2": "在此期间可能会出现 2 次材质加载动画，",
+  "overlay.ae2_texture_updater.reload_prompt.line3": "是否继续？",
+
+  "overlay.ae2_texture_updater.reload_prompt.button.continue": "继续",
+  "overlay.ae2_texture_updater.reload_prompt.button.later": "稍后",
+  "overlay.ae2_texture_updater.reload_prompt.button.cancel": "取消",
+
+  "overlay.ae2_texture_updater.reload_prompt.snoozed": "稍后提醒：%s 秒后再次询问",
+
+  "chat.ae2_texture_updater.reload_prompt.line": "[AE2材质更新器] 需要卸载并重新加载材质才能完成本次更新，期间会出现 2 次材质加载动画。请选择：",
+  "chat.ae2_texture_updater.reload_prompt.button.continue": "[继续]",
+  "chat.ae2_texture_updater.reload_prompt.button.later": "[稍后]",
+  "chat.ae2_texture_updater.reload_prompt.button.cancel": "[取消]",
+  "chat.ae2_texture_updater.reload_prompt.hover": "点击以执行对应操作",
+  "screen.ae2_texture_updater.reload_prompt.title": "AE2 Texture Updater 需要卸载并重新加载材质"
 }

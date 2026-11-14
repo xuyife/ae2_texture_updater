@@ -14,6 +14,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.xuyifei.ae2_texture_updater.AE2TextureUpdater;
 import net.xuyifei.ae2_texture_updater.config.ModConfig;
+import net.xuyifei.ae2_texture_updater.update.BackgroundUpdateState;
 import net.xuyifei.ae2_texture_updater.update.UpdateChecker;
 
 import java.net.URI;
@@ -72,7 +73,7 @@ public final class UpdateAvailableOverlay {
     @SubscribeEvent
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (pending == null || minecraft.screen != null) {
+        if (pending == null || minecraft.screen != null || BackgroundUpdateState.visible()) {
             return;
         }
         Window window = minecraft.getWindow();
@@ -83,7 +84,7 @@ public final class UpdateAvailableOverlay {
     /** With a screen open the HUD is already painted, so draw on top of the screen instead. */
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {
-        if (pending == null) {
+        if (pending == null || BackgroundUpdateState.visible()) {
             return;
         }
         draw(event.getGuiGraphics(), event.getScreen().width,
@@ -133,7 +134,7 @@ public final class UpdateAvailableOverlay {
      */
     @SubscribeEvent
     public static void onMousePressed(InputEvent.MouseButton.Pre event) {
-        if (pending == null || event.getButton() != 0) {
+        if (pending == null || event.getButton() != 0 || BackgroundUpdateState.visible()) {
             return;
         }
         Window window = Minecraft.getInstance().getWindow();

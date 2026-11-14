@@ -34,11 +34,15 @@ public final class ModListManager {
         }
 
         Path snapshotPath = CACHE_DIR.resolve("modlist_snapshot.json");
+        Path toUpdatePath = CACHE_DIR.resolve("to_update_mods.json");
         try {
             Files.createDirectories(CACHE_DIR);
             String previous = Files.exists(snapshotPath) ? Files.readString(snapshotPath) : null;
             boolean changed = previous == null || !previous.equals(currentModIds);
-            if (changed) {
+            // The pending list is regenerated whenever the snapshot moves OR the file is gone.
+            // A cancelled run deletes it while the snapshot stays valid, so relying on
+            // "changed" alone left DownloadManager reading a file that no longer exists.
+            if (changed || !Files.exists(toUpdatePath)) {
                 Files.writeString(snapshotPath, currentModIds);
                 writeToUpdateList();
             }
